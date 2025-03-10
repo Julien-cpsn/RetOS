@@ -1,6 +1,6 @@
-use goolog::set_target;
 use crate::printer::buffer::WRITER;
 use crate::terminal::error::CliError;
+use goolog::set_target;
 
 pub fn clear() -> Result<(), CliError> {
     set_target!("CLEAR");
@@ -8,3 +8,4 @@ pub fn clear() -> Result<(), CliError> {
     WRITER.write().clear();
     Ok(())
 }
+

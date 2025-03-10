@@ -16,3 +16,4 @@ impl InterruptIndex {
         usize::from(self.as_u8())
     }
 }
+

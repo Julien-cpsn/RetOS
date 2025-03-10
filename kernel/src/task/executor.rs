@@ -10,7 +10,8 @@ use x86_64::instructions::interrupts::enable_and_hlt;
 pub static WAKER_CACHE: Mutex<BTreeMap<TaskId, Waker>> = Mutex::new(BTreeMap::new());
 pub static TASKS: RwLock<BTreeMap<TaskId, Task>> = RwLock::new(BTreeMap::new());
 pub static NEW_TASKS: Mutex<Vec<Task>> = Mutex::new(Vec::new());
-pub static TASK_QUEUE: Lazy<Mutex<Arc<ArrayQueue<TaskId>>>> = Lazy::new(|| Mutex::new(Arc::new(ArrayQueue::new(100))));
+pub static TASK_QUEUE: Lazy<Mutex<Arc<ArrayQueue<TaskId>>>> =
+    Lazy::new(|| Mutex::new(Arc::new(ArrayQueue::new(100))));
 
 pub fn spawn_task(task: Task) {
     NEW_TASKS.lock().push(task);
@@ -25,6 +26,7 @@ fn run_ready_tasks() {
             if TASKS.write().insert(task_id, task).is_some() {
                 panic!("A task with same ID already in tasks");
             }
+
             TASK_QUEUE.lock().push(task_id).expect("Task queue full");
         }
     }
@@ -35,10 +37,8 @@ fn run_ready_tasks() {
 
         let task_state = {
             let tasks = TASKS.read();
-            let task = match tasks.get(&task_id) {
-                Some(task) => task,
-                // task no longer existe
-                None => continue,
+            let task = Some(tasks.get(&task_id)) else {
+                continue;
             };
 
             let waker = waker_cache
@@ -76,3 +76,4 @@ fn sleep_if_idle() {
         interrupts::enable();
     }
 }
+

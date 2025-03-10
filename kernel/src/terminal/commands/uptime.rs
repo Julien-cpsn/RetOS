@@ -9,3 +9,4 @@ pub fn uptime() -> Result<(), CliError> {
     println!("{}", MilliSecondClock::format());
     Ok(())
 }
+

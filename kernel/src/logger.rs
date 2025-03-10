@@ -21,3 +21,4 @@ pub fn print_log(timestamp: &str, target: &str, level: Level, args: &Arguments) 
     set_background!(DEFAULT_BACKGROUND);
     println!(" | {target}] {args}");
 }
+

@@ -1,7 +1,7 @@
-use goolog::{debug, set_target};
 use crate::println;
 use crate::task::executor::TASKS;
 use crate::terminal::error::CliError;
+use goolog::{debug, set_target};
 
 pub fn ps() -> Result<(), CliError> {
     set_target!("PS");
@@ -18,3 +18,4 @@ pub fn ps() -> Result<(), CliError> {
 
     Ok(())
 }
+

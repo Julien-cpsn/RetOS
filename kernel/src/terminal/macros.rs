@@ -43,7 +43,7 @@ macro_rules! add_verbosity {
             ),* $(,)?
         }
     ) => {
-        use crate::terminal::verbosity::Verbosity;
+        use $crate::terminal::verbosity::Verbosity;
 
         $(#[$enum_meta])*
         $vis enum $name<'a> {
@@ -59,6 +59,7 @@ macro_rules! add_verbosity {
         }
 
         impl<'a> $name<'a> {
+            #[must_use]
             pub fn get_verbosity(&self) -> &Option<Verbosity> {
                 match self {
                     $(Self::$variant { verbosity, .. } => verbosity),*

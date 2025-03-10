@@ -1,16 +1,12 @@
-use core::cmp::max;
+use crate::printer::color::{Color, DEFAULT_BACKGROUND, DEFAULT_FOREGROUND};
 use bootloader_api::info::{FrameBufferInfo, PixelFormat};
+use core::cmp::max;
 use core::fmt;
 use font_constants::BACKUP_CHAR;
 use noto_sans_mono_bitmap::{
-    get_raster,
-    get_raster_width,
-    FontWeight,
-    RasterHeight,
-    RasterizedChar,
+    get_raster, get_raster_width, FontWeight, RasterHeight, RasterizedChar,
 };
 use spin::{Lazy, RwLock};
-use crate::printer::color::{Color, DEFAULT_BACKGROUND, DEFAULT_FOREGROUND};
 
 /// Additional vertical space between lines
 const LINE_SPACING: usize = 2;
@@ -40,14 +36,16 @@ mod font_constants {
 
 /// A global `Writer` instance.
 /// Used by the `print!` and `println!` macros.
-pub static WRITER: Lazy<RwLock<Writer>> = Lazy::new(|| RwLock::new(Writer {
-    framebuffer: None,
-    info: None,
-    x: BORDER_PADDING,
-    y: BORDER_PADDING,
-    fg_color: DEFAULT_FOREGROUND,
-    bg_color: DEFAULT_BACKGROUND,
-}));
+pub static WRITER: Lazy<RwLock<Writer>> = Lazy::new(|| {
+    RwLock::new(Writer {
+        framebuffer: None,
+        info: None,
+        x: BORDER_PADDING,
+        y: BORDER_PADDING,
+        fg_color: DEFAULT_FOREGROUND,
+        bg_color: DEFAULT_BACKGROUND,
+    })
+});
 
 /// Supports newline characters and implements the `core::fmt::Write` trait.
 pub struct Writer {
@@ -105,7 +103,7 @@ impl Writer {
             let line_end = line_start + width;
             buffer[line_start..line_end].fill(0);
         }
-        
+
         //self.y = (self.y - 1) * width;
         self.carriage_return();
     }
@@ -113,12 +111,10 @@ impl Writer {
     pub fn erase_char(&mut self) {
         if self.x > BORDER_PADDING {
             self.x -= font_constants::CHAR_RASTER_WIDTH + LETTER_SPACING;
-        }
-        else if self.y > BORDER_PADDING {
+        } else if self.y > BORDER_PADDING {
             self.y -= font_constants::CHAR_RASTER_HEIGHT.val() + LINE_SPACING;
             self.x = self.width() - font_constants::CHAR_RASTER_WIDTH;
-        }
-        else {
+        } else {
             return;
         }
 
@@ -150,23 +146,27 @@ impl Writer {
                 if next_x >= self.width() {
                     self.newline();
                 }
+
                 let next_y = self.y + font_constants::CHAR_RASTER_HEIGHT.val() * 4 + BORDER_PADDING;
                 if next_y >= self.height() {
                     self.clear();
                 }
+
                 for _ in 0..4 {
                     self.write_rendered_char(get_char_raster(' '));
                 }
-            },
+            }
             c => {
                 let next_x = self.x + font_constants::CHAR_RASTER_WIDTH;
                 if next_x >= self.width() {
                     self.newline();
                 }
+
                 let next_y = self.y + font_constants::CHAR_RASTER_HEIGHT.val() + BORDER_PADDING;
                 if next_y >= self.height() {
                     self.clear();
                 }
+
                 self.write_rendered_char(get_char_raster(c));
             }
         }
@@ -188,14 +188,21 @@ impl Writer {
     fn blend(&self, alpha: u8) -> (u8, u8, u8) {
         let inv_alpha = 255 - alpha;
 
-        let out_r = ((self.fg_color.r as u16 * alpha as u16 + self.bg_color.r as u16 * inv_alpha as u16) / 255) as u8;
-        let out_g = ((self.fg_color.g as u16 * alpha as u16 + self.bg_color.g as u16 * inv_alpha as u16) / 255) as u8;
-        let out_b = ((self.fg_color.b as u16 * alpha as u16 + self.bg_color.b as u16 * inv_alpha as u16) / 255) as u8;
+        let out_r = ((self.fg_color.r as u16 * alpha as u16
+            + self.bg_color.r as u16 * inv_alpha as u16)
+            / 255) as u8;
+        let out_g = ((self.fg_color.g as u16 * alpha as u16
+            + self.bg_color.g as u16 * inv_alpha as u16)
+            / 255) as u8;
+        let out_b = ((self.fg_color.b as u16 * alpha as u16
+            + self.bg_color.b as u16 * inv_alpha as u16)
+            / 255) as u8;
 
         // Pack result
         (out_r, out_g, out_b)
     }
 
+    #[allow(clippy::many_single_char_names)]
     fn write_pixel(&mut self, x: usize, y: usize, r: u8, g: u8, b: u8) {
         let pixel_offset = y * self.info.unwrap().stride + x;
 
@@ -208,12 +215,13 @@ impl Writer {
             // if let Some(& mut info) = self.info {
             //     info.as_mut().pixel_format = PixelFormat::Rgb;
             // }
-            other => panic!("Pixel format {:?} not supported in logger", other)
+            other => panic!("Pixel format {:?} not supported in logger", other),
         };
         let bytes_per_pixel = self.info.unwrap().bytes_per_pixel;
         let byte_offset = pixel_offset * bytes_per_pixel;
         if let Some(buffer) = self.framebuffer.as_mut() {
-            buffer[byte_offset..(byte_offset + bytes_per_pixel)].copy_from_slice(&color[..bytes_per_pixel]);
+            buffer[byte_offset..(byte_offset + bytes_per_pixel)]
+                .copy_from_slice(&color[..bytes_per_pixel]);
 
             let _ = *&buffer[byte_offset];
         }
@@ -228,3 +236,4 @@ impl fmt::Write for Writer {
         Ok(())
     }
 }
+

@@ -12,28 +12,38 @@ pub fn tick_handler() {
 pub struct MilliSecondClock;
 
 impl MilliSecondClock {
-
     pub fn now() -> u32 {
         TICKS.load(Ordering::Relaxed)
     }
 
+    #[must_use]
     pub fn seconds() -> u32 {
         Self::now() / 10
     }
 
+    #[must_use]
     pub fn minutes() -> u32 {
         Self::seconds() / 60
     }
 
+    #[must_use]
     pub fn hours() -> u32 {
         Self::minutes() / 60
     }
 
+    #[must_use]
     pub fn format() -> String {
         let now = MilliSecondClock::now();
         let seconds = now / 10;
         let minutes = seconds / 60;
         let hours = minutes / 60;
-        format!("{:02}:{:02}:{:02}.{}", hours % 60, minutes % 60, seconds % 60, now % 100)
+        format!(
+            "{:02}:{:02}:{:02}.{}",
+            hours % 60,
+            minutes % 60,
+            seconds % 60,
+            now % 100
+        )
     }
 }
+

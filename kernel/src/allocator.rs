@@ -12,9 +12,14 @@ pub fn init_allocator() {
     #[global_allocator]
     static TALCK: Talck<Mutex<()>, ClaimOnOom> = Talc::new(unsafe {
         ClaimOnOom::new(Span::from_array(core::ptr::addr_of!(ARENA).cast_mut()))
-    }).lock::<Mutex<()>>();
-    
+    })
+    .lock::<Mutex<()>>();
+
     unsafe {
-        TALCK.lock().claim(Span::from(&raw mut ARENA)).expect("Could not claim heap");
+        TALCK
+            .lock()
+            .claim(Span::from(&raw mut ARENA))
+            .expect("Could not claim heap");
     }
 }
+

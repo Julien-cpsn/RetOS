@@ -61,7 +61,7 @@ pub fn add_scancode(scancode: u8) {
     if let Some(queue) = SCANCODE_QUEUE.get() {
         match queue.push(scancode) {
             Ok(_) => WAKER.wake(),
-            Err(_) => println!("WARNING: scancode queue full; dropping keyboard input")
+            Err(_) => println!("WARNING: scancode queue full; dropping keyboard input"),
         }
     } else {
         println!("WARNING: scancode queue uninitialized");
@@ -98,26 +98,27 @@ pub async fn handle_keyboard() {
                             handle_command(&mut cli, 0x1B);
                             handle_command(&mut cli, b'[');
                             handle_command(&mut cli, b'A');
-                        },
+                        }
                         KeyCode::ArrowDown => {
                             handle_command(&mut cli, 0x1B);
                             handle_command(&mut cli, b'[');
                             handle_command(&mut cli, b'B');
-                        },
+                        }
                         KeyCode::ArrowRight => {
                             handle_command(&mut cli, 0x1B);
                             handle_command(&mut cli, b'[');
                             handle_command(&mut cli, b'C');
-                        },
+                        }
                         KeyCode::ArrowLeft => {
                             handle_command(&mut cli, 0x1B);
                             handle_command(&mut cli, b'[');
                             handle_command(&mut cli, b'D');
-                        },
+                        }
                         _ => {}
-                    }
+                    },
                 }
             }
         }
     }
 }
+

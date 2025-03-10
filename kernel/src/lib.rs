@@ -1,5 +1,4 @@
 #![no_std]
-
 #![feature(abi_x86_interrupt)]
 #![feature(type_alias_impl_trait)]
 #![feature(allocator_api)]
@@ -8,14 +7,14 @@ extern crate alloc;
 
 use crate::interrupts::{gdt, idt};
 
-pub mod printer;
-pub mod interrupts;
-pub mod memory;
 pub mod allocator;
+pub mod clock;
+pub mod interrupts;
+pub mod logger;
+pub mod memory;
+pub mod printer;
 pub mod task;
 pub mod terminal;
-pub mod clock;
-pub mod logger;
 
 pub fn init() {
     print!("\t> Initializing GDT... ");
@@ -44,3 +43,4 @@ pub fn hlt_loop() -> ! {
         x86_64::instructions::hlt();
     }
 }
+

@@ -9,12 +9,12 @@ use bootloader_api::{BootInfo, BootloaderConfig};
 use core::panic::PanicInfo;
 use goolog::init_logger;
 use goolog::log::Level;
+use retos_kernel::clock::MilliSecondClock;
+use retos_kernel::logger::print_log;
 use retos_kernel::task::executor::{run_tasks, spawn_task};
 use retos_kernel::task::keyboard;
 use retos_kernel::task::task::Task;
 use retos_kernel::{printer, println};
-use retos_kernel::clock::MilliSecondClock;
-use retos_kernel::logger::print_log;
 
 const HELLO_WORLD: &str = r#"
 /----------------------------------\
@@ -56,11 +56,14 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
     println!("Initializing kernel...");
     retos_kernel::init();
     let post = unsafe { core::arch::x86_64::_rdtsc() };
-    println!("Kernel initialized! ({} CPU cycles)", (post - pre) / 100_000);
+    println!(
+        "Kernel initialized! ({} CPU cycles)",
+        (post - pre) / 100_000
+    );
     println!();
 
     /* --- Logger initialization --- */
-    
+
     init_logger(
         Some(Level::Trace),
         None,
@@ -69,7 +72,7 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
             print_log(&timestamp, target, level, args);
         },
     )
-        .expect("Could not initialize logger");
+    .expect("Could not initialize logger");
 
     /* --------------------------------- */
 
@@ -84,7 +87,10 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
 
     /* --- Kernel loop --- */
 
-    spawn_task(Task::new(String::from("Terminal"), keyboard::handle_keyboard()));
+    spawn_task(Task::new(
+        String::from("Terminal"),
+        keyboard::handle_keyboard(),
+    ));
     run_tasks();
 }
 
@@ -94,3 +100,4 @@ fn panic(info: &PanicInfo) -> ! {
     println!("{}", info);
     loop {}
 }
+

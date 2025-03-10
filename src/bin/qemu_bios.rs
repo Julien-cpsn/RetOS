@@ -12,3 +12,4 @@ fn main() {
         Some(code) => exit(code),
     }
 }
+

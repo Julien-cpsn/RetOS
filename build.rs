@@ -1,9 +1,11 @@
+use bootloader::DiskImageBuilder;
 use std::env;
 use std::path::PathBuf;
-use bootloader::DiskImageBuilder;
 
 fn main() {
-    let disk_builder = DiskImageBuilder::new(PathBuf::from(env::var("CARGO_BIN_FILE_RETOS_KERNEL").unwrap()));
+    let disk_builder = DiskImageBuilder::new(PathBuf::from(
+        env::var("CARGO_BIN_FILE_RETOS_KERNEL").unwrap(),
+    ));
 
     // specify output paths
     let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
@@ -18,3 +20,4 @@ fn main() {
     println!("cargo:rustc-env=UEFI_IMAGE={}", uefi_path.display());
     println!("cargo:rustc-env=BIOS_IMAGE={}", bios_path.display());
 }
+

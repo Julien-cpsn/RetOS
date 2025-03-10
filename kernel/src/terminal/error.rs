@@ -1,6 +1,6 @@
+use crate::terminal::terminal::TerminalBuffer;
 use embedded_cli::__private::io::{ErrorKind, ErrorType};
 use thiserror::Error;
-use crate::terminal::terminal::TerminalBuffer;
 
 #[derive(Error, Debug)]
 pub enum CliError {
@@ -17,3 +17,4 @@ impl embedded_cli::__private::io::Error for CliError {
 impl ErrorType for TerminalBuffer {
     type Error = CliError;
 }
+

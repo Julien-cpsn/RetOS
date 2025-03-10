@@ -11,3 +11,4 @@ fn main() {
     println!("UEFI disk image at {}", uefi_target.display());
     println!("BIOS disk image at {}", bios_target.display());
 }
+

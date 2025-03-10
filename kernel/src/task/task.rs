@@ -1,4 +1,3 @@
-use core::{future::Future, pin::Pin};
 use alloc::boxed::Box;
 use alloc::string::String;
 use alloc::sync::Arc;
@@ -6,6 +5,7 @@ use alloc::task::Wake;
 use core::fmt::{Debug, Formatter};
 use core::sync::atomic::{AtomicU64, Ordering};
 use core::task::{Context, Poll, Waker};
+use core::{future::Future, pin::Pin};
 use crossbeam_queue::ArrayQueue;
 use spin::Mutex;
 
@@ -61,7 +61,7 @@ impl TaskWaker {
             task_queue,
         }))
     }
-    
+
     fn wake_task(&self) {
         self.task_queue.push(self.task_id).expect("task_queue full");
     }
@@ -76,3 +76,4 @@ impl Wake for TaskWaker {
         self.wake_task();
     }
 }
+

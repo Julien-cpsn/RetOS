@@ -1,5 +1,5 @@
-use core::fmt;
 use crate::printer::buffer::WRITER;
+use core::fmt;
 
 #[macro_export]
 macro_rules! println {
@@ -26,12 +26,13 @@ pub fn _print(args: fmt::Arguments) {
 macro_rules! set_foreground {
     ($arg:tt) => {
         WRITER.write().fg_color = $arg;
-    }
+    };
 }
 
 #[macro_export]
 macro_rules! set_background {
     ($arg:tt) => {
         WRITER.write().bg_color = $arg;
-    }
+    };
 }
+

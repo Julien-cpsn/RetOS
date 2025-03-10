@@ -40,13 +40,16 @@ add_verbosity! {
     }
 }
 
-pub fn handle_command(cli: &mut Cli<&mut TerminalBuffer, CliError, [u8; 100], [u8; 100]>, byte: u8) {
+pub fn handle_command(
+    cli: &mut Cli<&mut TerminalBuffer, CliError, [u8; 100], [u8; 100]>,
+    byte: u8,
+) {
     cli.process_byte::<Command<'_>, _>(
         byte,
         &mut Command::processor(|_cli, command| {
             match command.get_verbosity() {
                 None => set_max_level(LevelFilter::Error),
-                Some(verbosity) => set_max_level(verbosity.level)
+                Some(verbosity) => set_max_level(verbosity.level),
             }
 
             match command {
@@ -59,5 +62,6 @@ pub fn handle_command(cli: &mut Cli<&mut TerminalBuffer, CliError, [u8; 100], [u
             }
         }),
     )
-        .expect("CLI processing failed");
+    .expect("CLI processing failed");
 }
+
