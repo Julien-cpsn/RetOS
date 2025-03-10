@@ -3,13 +3,14 @@ use alloc::boxed::Box;
 use alloc::string::String;
 use alloc::sync::Arc;
 use alloc::task::Wake;
+use core::fmt::{Debug, Formatter};
 use core::sync::atomic::{AtomicU64, Ordering};
 use core::task::{Context, Poll, Waker};
 use crossbeam_queue::ArrayQueue;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 #[repr(transparent)]
-pub struct TaskId(u64);
+pub struct TaskId(pub u64);
 
 pub struct Task {
     pub id: TaskId,
@@ -40,6 +41,15 @@ impl Task {
 
     pub fn poll(&mut self, context: &mut Context) -> Poll<()> {
         self.future.as_mut().poll(context)
+    }
+}
+
+impl Debug for Task {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("Task")
+            .field("id", &self.id)
+            .field("name", &self.name)
+            .finish()
     }
 }
 

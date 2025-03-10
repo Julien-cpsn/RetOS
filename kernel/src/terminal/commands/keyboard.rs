@@ -42,7 +42,7 @@ pub fn change_layout(layout: KeyboardLayoutArg) -> Result<(), CliError> {
     
     debug!("Locking and setting KEYBOARD mutex...");
     *KEYBOARD.write() = Keyboard::new(ScancodeSet1::new(), layout, HandleControl::Ignore);
-    debug!("KEYBOARD mutex set");
+    debug!("KEYBOARD mutex set and freed");
 
     Ok(())
 }
