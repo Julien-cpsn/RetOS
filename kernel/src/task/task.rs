@@ -7,6 +7,7 @@ use core::fmt::{Debug, Formatter};
 use core::sync::atomic::{AtomicU64, Ordering};
 use core::task::{Context, Poll, Waker};
 use crossbeam_queue::ArrayQueue;
+use spin::Mutex;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 #[repr(transparent)]
@@ -15,7 +16,7 @@ pub struct TaskId(pub u64);
 pub struct Task {
     pub id: TaskId,
     pub name: String,
-    future: Pin<Box<dyn Future<Output = ()> + Send + Sync>>,
+    future: Mutex<Pin<Box<dyn Future<Output = ()> + Send + Sync>>>,
 }
 
 pub struct TaskWaker {
@@ -35,12 +36,12 @@ impl Task {
         Task {
             id: TaskId::new(),
             name,
-            future: Box::pin(future),
+            future: Mutex::new(Box::pin(future)),
         }
     }
 
-    pub fn poll(&mut self, context: &mut Context) -> Poll<()> {
-        self.future.as_mut().poll(context)
+    pub fn poll(&self, context: &mut Context) -> Poll<()> {
+        self.future.lock().as_mut().poll(context)
     }
 }
 
