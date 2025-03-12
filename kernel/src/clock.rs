@@ -34,6 +34,6 @@ impl MilliSecondClock {
         let seconds = now / 10;
         let minutes = seconds / 60;
         let hours = minutes / 60;
-        format!("{:02}:{:02}:{:02}.{}", hours % 60, minutes % 60, seconds % 60, now % 100)
+        format!("{:02}:{:02}:{:02}.{:02}", hours % 60, minutes % 60, seconds % 60, now % 100)
     }
 }
