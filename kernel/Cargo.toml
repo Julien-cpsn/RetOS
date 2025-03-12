@@ -16,9 +16,10 @@ talc = "4.4.2"
 crossbeam-queue = { version = "0.3.12", default-features = false, features = ["alloc", "nightly"] }
 futures-util = { version = "0.3.31", default-features = false, features = ["alloc"] }
 
-# Hardware
+# Devices
 pc-keyboard = "0.8.0"
 pic8259 = "0.11.0"
+pci_types = "0.10.0"
 
 # Cli
 embedded-cli = "0.2.1"
@@ -33,3 +34,4 @@ goolog = { version = "0.10.1", git = "https://github.com/Julien-cpsn/goolog" }
 strum = { version = "0.27.1", default-features = false, features = ["derive"] }
 paste = "1.0.15"
 noto-sans-mono-bitmap = { version = "0.3.1", default-features = false, features = ["regular", "size_16", "unicode-basic-latin", "unicode-specials", "unicode-latin-1-supplement", "unicode-latin-extended-a"]}
+text-tables = { version = "0.4.0", git = "https://github.com/Julien-cpsn/text-table-rs" }

@@ -8,13 +8,14 @@ use bootloader_api::config::Mapping;
 use bootloader_api::{BootInfo, BootloaderConfig};
 use core::panic::PanicInfo;
 use goolog::init_logger;
-use goolog::log::Level;
+use goolog::log::{set_max_level, Level, LevelFilter};
+use retos_kernel::clock::MilliSecondClock;
+use retos_kernel::logger::print_log;
 use retos_kernel::task::executor::{run_tasks, spawn_task};
 use retos_kernel::task::keyboard;
 use retos_kernel::task::task::Task;
+use retos_kernel::terminal::commands::scanpci::scanpci;
 use retos_kernel::{printer, println};
-use retos_kernel::clock::MilliSecondClock;
-use retos_kernel::logger::print_log;
 
 const HELLO_WORLD: &str = r#"
 /----------------------------------\
@@ -71,6 +72,8 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
     )
         .expect("Could not initialize logger");
 
+    set_max_level(LevelFilter::Off);
+    
     /* --------------------------------- */
 
     // Paginate memory
@@ -80,10 +83,9 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
     let mut frame_allocator = unsafe { BootInfoFrameAllocator::init(&boot_info.memory_regions) };
     */
 
-    println!("======= User input starts =======");
-
     /* --- Kernel loop --- */
 
+    spawn_task(Task::new(String::from("Scan PCI"), async { scanpci().unwrap(); }));
     spawn_task(Task::new(String::from("Terminal"), keyboard::handle_keyboard()));
     run_tasks();
 }

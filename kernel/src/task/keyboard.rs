@@ -73,6 +73,8 @@ pub async fn handle_keyboard() {
 
     let mut scancodes = ScancodeStream::new();
 
+    println!("======= User input starts =======");
+
     let mut terminal_buffer = TerminalBuffer;
     let command_buffer: [u8; 100] = [0; 100];
     let history_buffer: [u8; 100] = [0; 100];

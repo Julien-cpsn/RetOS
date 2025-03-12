@@ -712,6 +712,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f0ca629cbb3f0d5b699c338f0129ff78c9bfd7ea8b1258ad529bff490dc8ed5a"
 
 [[package]]
+name = "pci_types"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c4325c6aa3cca3373503b1527e75756f9fbfe5fd76be4b4c8a143ee47430b8e0"
+dependencies = [
+ "bit_field",
+ "bitflags 2.8.0",
+]
+
+[[package]]
 name = "percent-encoding"
 version = "2.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -792,10 +802,12 @@ dependencies = [
  "noto-sans-mono-bitmap",
  "paste",
  "pc-keyboard",
+ "pci_types",
  "pic8259",
  "spin",
  "strum",
  "talc",
+ "text-tables",
  "thiserror 2.0.11",
  "x86_64",
 ]
@@ -1062,6 +1074,11 @@ dependencies = [
  "rustix",
  "windows-sys 0.59.0",
 ]
+
+[[package]]
+name = "text-tables"
+version = "0.4.0"
+source = "git+https://github.com/Julien-cpsn/text-table-rs#95b4137ccc6f26ad6027c43e4b1f9cb3e044e3ab"
 
 [[package]]
 name = "thiserror"

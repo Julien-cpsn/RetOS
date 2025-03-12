@@ -2,8 +2,8 @@ use spin::Mutex;
 use talc::{ClaimOnOom, Span, Talc, Talck};
 
 pub const HEAP_START: usize = 0x_4444_4444_0000;
-/// 100 KiB
-pub const HEAP_SIZE: usize = 100 * 1024;
+/// 32 MB
+pub const HEAP_SIZE: usize = 32 * 1000 * 1000;
 
 pub static mut ARENA: [u8; HEAP_SIZE] = [0; HEAP_SIZE];
 

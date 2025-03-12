@@ -16,6 +16,7 @@ pub mod task;
 pub mod terminal;
 pub mod clock;
 pub mod logger;
+pub mod devices;
 
 pub fn init() {
     print!("\t> Initializing GDT... ");
@@ -30,9 +31,9 @@ pub fn init() {
     unsafe { interrupts::pics::PICS.write().initialize() };
     println!("initialized!");
 
-    print!("\t> Initializing heap... ");
+    print!("\t> Allocating heap... ");
     allocator::init_allocator();
-    println!("initialized!");
+    println!("allocated!");
 
     print!("\t> Enabling interrupts... ");
     x86_64::instructions::interrupts::enable();
