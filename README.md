@@ -62,13 +62,15 @@ find ./target/release -name "retos-*.img"
 - Devices
   - [ ] VirtIO? (maybe [rust-osdev/virtio](https://docs.rs/virtio-spec/latest/virtio_spec/))
   - [ ] NIC (E1000)
-  - [ ] PCI (maybe)
   - [ ] USB (maybe [rust-osdev/usb](https://github.com/rust-osdev/usb))
   - [ ] xHCI (maybe [rust-osdev/xhci](https://docs.rs/xhci/latest/xhci/))
   - [ ] APIC (maybe [this merge request](https://github.com/rust-osdev/bootloader/pull/460/files))
+  - [x] PCI (WIP with [pci_types](https://docs.rs/pci_types/0.10.0/pci_types/))
   - [x] PS2 Keyboard (with [pc_keyboard](https://github.com/rust-embedded-community/pc-keyboard))
   - [x] PIC (with [pic8259](https://github.com/rust-osdev/pic8259))
 - Commands
+  - [x] scanpci
+  - [x] lspci
   - [x] ps
   - [x] shutdown (WIP)
   - [x] keyboard (change keyboard layout)
