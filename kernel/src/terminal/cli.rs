@@ -5,6 +5,8 @@ use crate::terminal::commands::keyboard::{change_layout, KeyboardLayoutArg};
 use crate::terminal::commands::ps::ps;
 use crate::terminal::commands::shutdown::shutdown;
 use crate::terminal::commands::uptime::uptime;
+use crate::terminal::commands::lspci::lspci;
+use crate::terminal::commands::scanpci::scanpci;
 use crate::terminal::error::CliError;
 use crate::terminal::terminal::TerminalBuffer;
 use embedded_cli::cli::Cli;
@@ -31,6 +33,12 @@ add_verbosity! {
             /// Keyboard layout to use
             layout: KeyboardLayoutArg,
         },
+        
+        /// List PCI devices
+        Lspci,
+        
+        /// Enforces PCI device scan
+        Scanpci,
 
         /// Print for how much time the system is running
         Uptime,
@@ -54,6 +62,8 @@ pub fn handle_command(cli: &mut Cli<&mut TerminalBuffer, CliError, [u8; 100], [u
                 Command::Clear { .. } => clear(),
                 Command::Ps { .. } => ps(),
                 Command::Keyboard { layout, .. } => change_layout(layout),
+                Command::Lspci { .. } => lspci(),
+                Command::Scanpci { .. } => scanpci(),
                 Command::Uptime { .. } => uptime(),
                 Command::Shutdown { .. } => shutdown(),
             }

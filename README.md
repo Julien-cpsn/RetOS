@@ -79,6 +79,7 @@ find ./target/release -name "retos-*.img"
   - [ ] TCP/IP stack (maybe [smol-tcp](https://github.com/smoltcp-rs/smoltcp))
   - [ ] Routing stack
 - Memory
+  - [ ] More precise heap allocation
   - [x] Heap allocation (with [Talc](https://github.com/SFBdragon/talc))
   - [x] Memory pagination
 - Others
