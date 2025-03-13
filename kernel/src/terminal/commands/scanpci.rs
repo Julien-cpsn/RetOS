@@ -14,11 +14,9 @@ pub fn scanpci() -> Result<(), CliError> {
 
     trace!("Beginning PCI scan");
     for bus in 0..=255 {
-        trace!("Bus {bus}");
         for device in 0..=31 {
-            trace!("Device {device}");
             for function in 0..=7 {
-                trace!("Function {function}");
+                trace!("Bus {bus}, Device {device}, Function {function}");
                 let pci_address = PciAddress::new(0, bus, device, function);
                 let pci_header = PciHeader::new(pci_address);
                 let (vendor_id, device_id) = pci_header.id(&PCI_ACCESS);
@@ -28,8 +26,9 @@ pub fn scanpci() -> Result<(), CliError> {
                     continue;
                 }
 
+                debug!("Found Vendor: {vendor_id}, Device: {device_id}");
+                
                 let (vendor_name, device_name) = find_pci_vendor_and_device(vendor_id, device_id);
-
 
                 let (revision, class, subclass, _) = pci_header.revision_and_class(&PCI_ACCESS);
 
