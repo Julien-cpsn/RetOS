@@ -51,7 +51,7 @@ find ./target/release -name "retos-*.img"
 
 - Core
   - [ ] Multi-threading
-  - [x] Log system (with [my fork](https://github.com/Julien-cpsn/goolog) of [goolog](https://github.com/Gooxey/goolog))
+  - [x] Log system (with [goolog](https://github.com/Gooxey/goolog))
   - [x] Internal clock
   - [x] Command Line Interface (with [embedded-cli-rs](https://github.com/funbiscuit/embedded-cli-rs))
   - [x] Async/Await

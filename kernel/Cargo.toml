@@ -25,10 +25,10 @@ pci_types = "0.10.0"
 embedded-cli = "0.2.1"
 
 # Errors
-thiserror = { version = "2.0.11", default-features = false }
+thiserror = { version = "2.0.12", default-features = false }
 
 # Log
-goolog = { version = "0.10.1", git = "https://github.com/Julien-cpsn/goolog" }
+goolog = "0.11.0"
 
 # Utils
 strum = { version = "0.27.1", default-features = false, features = ["derive"] }

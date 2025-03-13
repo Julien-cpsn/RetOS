@@ -8,7 +8,7 @@ default-run = "qemu_bios"
 members = ["kernel"]
 
 [dependencies]
-ovmf-prebuilt = "0.2.1"
+ovmf-prebuilt = "0.2.2"
 
 [build-dependencies]
 bootloader = "0.11.10"
