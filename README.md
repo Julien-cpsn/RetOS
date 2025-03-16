@@ -1,9 +1,9 @@
+> [!WARNING]
+> This is a PhD project, and it is still very WIP.
+
 # RetOS
 
 A Router Network Operating System. RetOS comes from *retis* which mean *network* in Latin.
-
-> [!WARNING]
-> This is a PhD project, and it is still very WIP.
 
 > [!NOTE]
 > This Operating System is based on the great [Writing an OS in Rust](https://os.phil-opp.com/) from [@phil-opp](https://github.com/phil-opp). 
@@ -41,11 +41,34 @@ By running the following command, you will build the OS images and the executabl
 cargo build --release
 ```
 
-If you need the images (`.img` files), you can find them like so:
+### Burn to hard drive/USB stick
+
+#### 1. Get the image path
+
+Build the OS and find the image file you want to use (BIOS or UEFI), you can do it like so:
 
 ```shell
-find ./target/release -name "retos-*.img"
+cargo build --release
+find ./target/release -maxdepth 1 -name "*.img"
 ```
+
+#### 2. Find the hard drive/USB stick
+
+You can find is by using the `lsblk` command. A possible selection for your device can be like `/dev/sda1`.
+
+#### 3. Burn the image
+
+Now you have to burn the image on the hard drive/USB stick with the following command:
+
+```shell
+dd if=<IMAGE_PATH> of=<DEVICE> bs=1M && sync
+```
+#### 4. Run it live!
+
+You can directly plug your device onto the PC and boot it :)
+
+> [!NOTE]
+> If you are using the BIOS image, you may want to enable CMS
 
 ## Done & TODOs
 
