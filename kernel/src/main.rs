@@ -11,11 +11,14 @@ use goolog::init_logger;
 use goolog::log::{set_max_level, Level, LevelFilter};
 use retos_kernel::clock::MilliSecondClock;
 use retos_kernel::logger::print_log;
+use retos_kernel::memory::tables::{MAPPER, MEMORY_REGIONS};
 use retos_kernel::task::executor::{run_tasks, spawn_task};
 use retos_kernel::task::keyboard;
 use retos_kernel::task::task::Task;
 use retos_kernel::terminal::commands::scanpci::scanpci;
-use retos_kernel::{printer, println};
+use retos_kernel::{memory, printer, println};
+use spin::Mutex;
+use x86_64::VirtAddr;
 
 const HELLO_WORLD: &str = r#"
 /----------------------------------\
@@ -73,16 +76,13 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
         .expect("Could not initialize logger");
 
     set_max_level(LevelFilter::Off);
-    
-    /* --------------------------------- */
 
-    // Paginate memory
-    /*
+    /* --- Memory pagination --- */
+
     let physical_memory_offset = boot_info.physical_memory_offset.take().expect("No physical memory");
-    let mut mapper = unsafe { memory::tables::init(VirtAddr::new(physical_memory_offset)) };
-    let mut frame_allocator = unsafe { BootInfoFrameAllocator::init(&boot_info.memory_regions) };
-    */
-
+    MAPPER.call_once(|| Mutex::new(unsafe { memory::tables::init(VirtAddr::new(physical_memory_offset)) }));
+    MEMORY_REGIONS.call_once(|| Mutex::new(boot_info.memory_regions.to_vec()));
+    
     /* --- Kernel loop --- */
 
     spawn_task(Task::new(String::from("Scan PCI"), async { scanpci().unwrap(); }));

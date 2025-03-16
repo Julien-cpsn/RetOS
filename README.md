@@ -50,6 +50,7 @@ find ./target/release -name "retos-*.img"
 ## Done & TODOs
 
 - Core
+  - [ ] ANSII colors
   - [ ] Multi-threading
   - [x] Log system (with [goolog](https://github.com/Gooxey/goolog))
   - [x] Internal clock
@@ -62,7 +63,7 @@ find ./target/release -name "retos-*.img"
 - Devices
   - [ ] VirtIO? (maybe [rust-osdev/virtio](https://docs.rs/virtio-spec/latest/virtio_spec/))
   - [ ] NIC (E1000)
-  - [ ] USB (maybe [rust-osdev/usb](https://github.com/rust-osdev/usb))
+  - [ ] USB (maybe [rust-osdev/usb](https://github.com/rust-osdev/usb) or [usb-device](https://docs.rs/usb-device/latest/usb_device/index.html))
   - [ ] xHCI (maybe [rust-osdev/xhci](https://docs.rs/xhci/latest/xhci/))
   - [ ] APIC (maybe [this merge request](https://github.com/rust-osdev/bootloader/pull/460/files))
   - [x] PCI (WIP with [pci_types](https://docs.rs/pci_types/0.10.0/pci_types/))

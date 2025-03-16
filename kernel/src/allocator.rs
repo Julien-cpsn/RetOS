@@ -1,7 +1,7 @@
 use spin::Mutex;
 use talc::{ClaimOnOom, Span, Talc, Talck};
 
-pub const HEAP_START: usize = 0x_4444_4444_0000;
+pub const HEAP_START: usize = 0x4444_4444_0000;
 /// 32 MB
 pub const HEAP_SIZE: usize = 32 * 1000 * 1000;
 

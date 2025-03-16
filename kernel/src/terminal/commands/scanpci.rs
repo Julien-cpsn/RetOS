@@ -1,4 +1,5 @@
 use alloc::string::{ToString};
+use alloc::sync::Arc;
 use crate::devices::pci::{parse_pci_subclass, PciClass, PciDevice, PCI_ACCESS, PCI_DEVICES};
 use crate::terminal::error::CliError;
 use goolog::{debug, set_target, trace};
@@ -30,7 +31,7 @@ pub fn scanpci() -> Result<(), CliError> {
                 
                 let (vendor_name, device_name) = find_pci_vendor_and_device(vendor_id, device_id);
 
-                let (revision, class, subclass, _) = pci_header.revision_and_class(&PCI_ACCESS);
+                let (revision, class, subclass, interface) = pci_header.revision_and_class(&PCI_ACCESS);
 
                 let pci_class = PciClass::from_repr(class).expect("Unknown PCI class");
                 let pci_subclass = parse_pci_subclass(&pci_class, subclass);
@@ -39,15 +40,16 @@ pub fn scanpci() -> Result<(), CliError> {
                     address: pci_address,
                     class: pci_class,
                     subclass: pci_subclass,
+                    revision,
+                    interface,
                     vendor_name: vendor_name.to_string(),
                     device_name: device_name.to_string(),
-                    revision
                 };
                 
                 debug!("Locking PCI_DEVICES mutex...");
                 PCI_DEVICES.write().insert(
                     (bus, device, function),
-                    RwLock::new(pci_device)
+                    Arc::new(RwLock::new(pci_device))
                 );
                 debug!("PCI_DEVICES mutex freed");
             }

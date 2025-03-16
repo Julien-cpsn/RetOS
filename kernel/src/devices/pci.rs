@@ -1,5 +1,6 @@
 use alloc::collections::BTreeMap;
 use alloc::string::{String, ToString};
+use alloc::sync::Arc;
 use core::fmt::{Display, Formatter};
 use pci_types::{ConfigRegionAccess, PciAddress};
 use spin::RwLock;
@@ -10,7 +11,7 @@ const PCI_CONFIG_ADDRESS: u16 = 0xCF8;
 const PCI_CONFIG_DATA: u16 = 0xCFC;
 
 pub static PCI_ACCESS: PciAccess = PciAccess;
-pub static PCI_DEVICES: RwLock<BTreeMap<(u8, u8, u8), RwLock<PciDevice>>> = RwLock::new(BTreeMap::new());
+pub static PCI_DEVICES: RwLock<BTreeMap<(u8, u8, u8), Arc<RwLock<PciDevice>>>> = RwLock::new(BTreeMap::new());
 
 pub struct PciAccess;
 
@@ -18,9 +19,10 @@ pub struct PciDevice {
     pub address: PciAddress,
     pub class: PciClass,
     pub subclass: AnyPciSubclass,
+    pub revision: u8,
+    pub interface: u8,
     pub vendor_name: String,
     pub device_name: String,
-    pub revision: u8,
 }
 
 impl ConfigRegionAccess for PciAccess {
@@ -57,10 +59,7 @@ impl ConfigRegionAccess for PciAccess {
 
 pub fn parse_pci_subclass(class: &PciClass, subclass: u8) -> AnyPciSubclass {
     let result = match class {
-        PciClass::DevicesBuiltBeforeClassCodes => match DevicesBuiltBeforeClassCodes::from_repr(subclass) {
-            None => None,
-            Some(subclass) => Some(AnyPciSubclass::DevicesBuiltBeforeClassCodes(subclass))
-        },
+        PciClass::DevicesBuiltBeforeClassCodes => DevicesBuiltBeforeClassCodes::from_repr(subclass).map(AnyPciSubclass::DevicesBuiltBeforeClassCodes),
         PciClass::MassStorageController => Some(AnyPciSubclass::MassStorageController(MassStorageController::from_repr(subclass).unwrap_or_default())),
         PciClass::NetworkController => Some(AnyPciSubclass::NetworkController(NetworkController::from_repr(subclass).unwrap_or_default())),
         PciClass::DisplayController => Some(AnyPciSubclass::DisplayController(DisplayController::from_repr(subclass).unwrap_or_default())),
@@ -69,25 +68,16 @@ pub fn parse_pci_subclass(class: &PciClass, subclass: u8) -> AnyPciSubclass {
         PciClass::Bridge => Some(AnyPciSubclass::Bridge(Bridge::from_repr(subclass).unwrap_or_default())),
         PciClass::CommunicationsController => Some(AnyPciSubclass::CommunicationsController(CommunicationController::from_repr(subclass).unwrap_or_default())),
         PciClass::GenericSystemPeripheral => Some(AnyPciSubclass::GenericSystemPeripheral(GenericSystemPeripheral::from_repr(subclass).unwrap_or_default())),
-        PciClass::InuptDevice => Some(AnyPciSubclass::InputDeviceController(InputDeviceController::from_repr(subclass).unwrap_or_default())),
+        PciClass::InputDevice => Some(AnyPciSubclass::InputDeviceController(InputDeviceController::from_repr(subclass).unwrap_or_default())),
         PciClass::DockingStation => Some(AnyPciSubclass::DockingStation(DockingStation::from_repr(subclass).unwrap_or_default())),
-        PciClass::Processor => match Processor::from_repr(subclass) {
-            None => None,
-            Some(subclass) => Some(AnyPciSubclass::Processor(subclass))
-        }
+        PciClass::Processor => Processor::from_repr(subclass).map(AnyPciSubclass::Processor),
         PciClass::SerialBusController => Some(AnyPciSubclass::SerialBusController(SerialBusController::from_repr(subclass).unwrap_or_default())),
-        PciClass::WirelessController => match WirelessController::from_repr(subclass) {
-            None => None,
-            Some(subclass) => Some(AnyPciSubclass::WirelessController(subclass))
-        }
+        PciClass::WirelessController => WirelessController::from_repr(subclass).map(AnyPciSubclass::WirelessController),
         PciClass::IntelligentController => match subclass {
             0x00 => Some(AnyPciSubclass::IntelligentController),
             _ => None
         }
-        PciClass::SatelliteCommunicationsController => match SatelliteCommunicationsController::from_repr(subclass) {
-            None => None,
-            Some(subclass) => Some(AnyPciSubclass::SatelliteCommunicationsController(subclass))
-        }
+        PciClass::SatelliteCommunicationsController => SatelliteCommunicationsController::from_repr(subclass).map(AnyPciSubclass::SatelliteCommunicationsController),
         PciClass::EncryptionController => Some(AnyPciSubclass::EncryptionController(EncryptionController::from_repr(subclass).unwrap_or_default())),
         PciClass::SignalProcessingController => Some(AnyPciSubclass::SignalProcessingController(SignalProcessingController::from_repr(subclass).unwrap_or_default())),
         PciClass::ProcessingAccelerators => Some(AnyPciSubclass::ProcessingAccelerators(ProcessingAccelerators::from_repr(subclass).unwrap_or_default())),
@@ -96,10 +86,10 @@ pub fn parse_pci_subclass(class: &PciClass, subclass: u8) -> AnyPciSubclass {
         PciClass::UnassignedClass => Some(AnyPciSubclass::UnassignedClass)
     };
 
-    result.unwrap_or_else(|| AnyPciSubclass::UnassignedClass)
+    result.unwrap_or(AnyPciSubclass::UnassignedClass)
 }
 
-#[derive(Display, FromRepr)]
+#[derive(Debug, Display, FromRepr, PartialEq)]
 #[repr(u8)]
 pub enum PciClass {
     DevicesBuiltBeforeClassCodes = 0x00,
@@ -111,7 +101,7 @@ pub enum PciClass {
     Bridge = 0x06,
     CommunicationsController = 0x07,
     GenericSystemPeripheral = 0x08,
-    InuptDevice = 0x09,
+    InputDevice = 0x09,
     DockingStation = 0x0A,
     Processor = 0x0B,
     SerialBusController = 0x0C,
@@ -126,6 +116,7 @@ pub enum PciClass {
     UnassignedClass = 0xFF,
 }
 
+#[derive(Debug, PartialEq)]
 pub enum AnyPciSubclass {
     DevicesBuiltBeforeClassCodes(DevicesBuiltBeforeClassCodes),
     MassStorageController(MassStorageController),
@@ -180,7 +171,7 @@ impl Display for AnyPciSubclass {
     }
 }
 
-#[derive(Display, FromRepr)]
+#[derive(Debug, Display, FromRepr, PartialEq)]
 #[repr(u8)]
 pub enum DevicesBuiltBeforeClassCodes {
     NonVgaUnclassifiedDevice = 0x00,
@@ -188,7 +179,7 @@ pub enum DevicesBuiltBeforeClassCodes {
     ImageCoprocessor = 0x05
 }
 
-#[derive(Default, Display, FromRepr)]
+#[derive(Default, Debug, Display, FromRepr, PartialEq)]
 #[repr(u8)]
 pub enum MassStorageController {
     ScsiStorageController = 0x00,
@@ -205,7 +196,7 @@ pub enum MassStorageController {
     MassStorageController = 0x80
 }
 
-#[derive(Default, Display, FromRepr)]
+#[derive(Default, Debug, Display, FromRepr, PartialEq)]
 #[repr(u8)]
 pub enum NetworkController {
     EthernetController = 0x00,
@@ -221,7 +212,7 @@ pub enum NetworkController {
     NetworkController = 0x80,
 }
 
-#[derive(Default, Display, FromRepr)]
+#[derive(Default, Debug, Display, FromRepr, PartialEq)]
 #[repr(u8)]
 pub enum DisplayController {
     VgaCompatibleController = 0x00,
@@ -231,7 +222,7 @@ pub enum DisplayController {
     DisplayController = 0x80,
 }
 
-#[derive(Default, Display, FromRepr)]
+#[derive(Default, Debug, Display, FromRepr, PartialEq)]
 #[repr(u8)]
 pub enum MultimediaController {
     MultimediaVideoController = 0x00,
@@ -242,7 +233,7 @@ pub enum MultimediaController {
     MultimediaController = 0x80,
 }
 
-#[derive(Default, Display, FromRepr)]
+#[derive(Default, Debug, Display, FromRepr, PartialEq)]
 #[repr(u8)]
 pub enum MemoryController {
     RamMemory = 0x00,
@@ -252,7 +243,7 @@ pub enum MemoryController {
     MemoryController = 0x80,
 }
 
-#[derive(Default, Display, FromRepr)]
+#[derive(Default, Debug, Display, FromRepr, PartialEq)]
 #[repr(u8)]
 pub enum Bridge {
     HostBridge = 0x00,
@@ -270,7 +261,7 @@ pub enum Bridge {
     Bridge = 0x80,
 }
 
-#[derive(Default, Display, FromRepr)]
+#[derive(Default, Debug, Display, FromRepr, PartialEq)]
 #[repr(u8)]
 pub enum CommunicationController {
     SerialController = 0x00,
@@ -283,7 +274,7 @@ pub enum CommunicationController {
     CommunicationController = 0x80,
 }
 
-#[derive(Default, Display, FromRepr)]
+#[derive(Default, Debug, Display, FromRepr, PartialEq)]
 #[repr(u8)]
 pub enum GenericSystemPeripheral {
     Pic = 0x00,
@@ -298,7 +289,7 @@ pub enum GenericSystemPeripheral {
     TimingCard = 0x99,
 }
 
-#[derive(Default, Display, FromRepr)]
+#[derive(Default, Debug, Display, FromRepr, PartialEq)]
 #[repr(u8)]
 pub enum InputDeviceController {
     KeyboardController = 0x00,
@@ -310,7 +301,7 @@ pub enum InputDeviceController {
     InputDeviceController = 0x80,
 }
 
-#[derive(Default, Display, FromRepr)]
+#[derive(Default, Debug, Display, FromRepr, PartialEq)]
 #[repr(u8)]
 pub enum DockingStation {
     GenericDockingStation = 0x00,
@@ -318,7 +309,7 @@ pub enum DockingStation {
     DockingStation = 0x80,
 }
 
-#[derive(Display, FromRepr)]
+#[derive(Debug, Display, FromRepr, PartialEq)]
 #[repr(u8)]
 pub enum Processor {
     I386 = 0x00,
@@ -330,7 +321,7 @@ pub enum Processor {
     CoProcessor = 0x40,
 }
 
-#[derive(Default, Display, FromRepr)]
+#[derive(Default, Debug, Display, FromRepr, PartialEq)]
 #[repr(u8)]
 pub enum SerialBusController {
     /// IEEE 1394
@@ -348,7 +339,7 @@ pub enum SerialBusController {
     SerialBusController = 0x80
 }
 
-#[derive(Default, Display, FromRepr)]
+#[derive(Default, Debug, Display, FromRepr, PartialEq)]
 #[repr(u8)]
 pub enum WirelessController {
     IrdaController = 0x00,
@@ -362,7 +353,7 @@ pub enum WirelessController {
     WirelessController = 0x80
 }
 
-#[derive(Display, FromRepr)]
+#[derive(Debug, Display, FromRepr, PartialEq)]
 #[repr(u8)]
 pub enum SatelliteCommunicationsController {
     SatelliteTvController = 0x01,
@@ -371,7 +362,7 @@ pub enum SatelliteCommunicationsController {
     SatelliteDataCommunicationController = 0x04,
 }
 
-#[derive(Default, Display, FromRepr)]
+#[derive(Default, Debug, Display, FromRepr, PartialEq)]
 #[repr(u8)]
 pub enum EncryptionController {
     NetworkAndComputingEncryptionDevice = 0x00,
@@ -380,7 +371,7 @@ pub enum EncryptionController {
     EncryptionController = 0x80
 }
 
-#[derive(Default, Display, FromRepr)]
+#[derive(Default, Debug, Display, FromRepr, PartialEq)]
 #[repr(u8)]
 pub enum SignalProcessingController {
     DpioModule = 0x00,
@@ -391,7 +382,7 @@ pub enum SignalProcessingController {
     SignalProcessingController = 0x80
 }
 
-#[derive(Default, Display, FromRepr)]
+#[derive(Default, Debug, Display, FromRepr, PartialEq)]
 #[repr(u8)]
 pub enum ProcessingAccelerators {
     #[default]

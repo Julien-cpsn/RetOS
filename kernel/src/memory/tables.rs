@@ -1,5 +1,12 @@
+use alloc::vec::Vec;
+use bootloader_api::info::MemoryRegion;
+use spin::{Mutex, Once};
 use x86_64::structures::paging::{OffsetPageTable, PageTable};
 use x86_64::{PhysAddr, VirtAddr};
+
+
+pub static MAPPER: Once<Mutex<OffsetPageTable<'static>>> = Once::new();
+pub static MEMORY_REGIONS: Once<Mutex<Vec<MemoryRegion>>> = Once::new();
 
 /// Initialize a new OffsetPageTable.
 ///
@@ -36,7 +43,7 @@ unsafe fn active_level_4_table(physical_memory_offset: VirtAddr) -> &'static mut
 /// This function is unsafe because the caller must guarantee that the
 /// complete physical memory is mapped to virtual memory at the passed
 /// `physical_memory_offset`.
-pub unsafe fn translate_addr(addr: VirtAddr, physical_memory_offset: VirtAddr) -> Option<PhysAddr> {
+pub fn translate_addr(addr: VirtAddr, physical_memory_offset: VirtAddr) -> Option<PhysAddr> {
     translate_addr_inner(addr, physical_memory_offset)
 }
 
@@ -69,11 +76,9 @@ fn translate_addr_inner(addr: VirtAddr, physical_memory_offset: VirtAddr) -> Opt
         frame = match entry.frame() {
             Ok(frame) => frame,
             Err(FrameError::FrameNotPresent) => return None,
-            Err(FrameError::HugeFrame) => panic!("huge pages not supported"),
-        };
+            Err(FrameError::HugeFrame) => panic!("Huge page detected at level {:?} for address {:#X}", index, addr.as_u64())};
     }
 
     // calculate the physical address by adding the page offset
     Some(frame.start_address() + u64::from(addr.page_offset()))
 }
-
