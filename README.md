@@ -50,8 +50,8 @@ find ./target/release -name "retos-*.img"
 ## Done & TODOs
 
 - Core
-  - [ ] ANSII colors
   - [ ] Multi-threading
+  - [x] ANSI colors (WIP)
   - [x] Log system (with [goolog](https://github.com/Gooxey/goolog))
   - [x] Internal clock
   - [x] Command Line Interface (with [embedded-cli-rs](https://github.com/funbiscuit/embedded-cli-rs))

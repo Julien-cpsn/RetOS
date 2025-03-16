@@ -35,4 +35,5 @@ goolog = "0.11.0"
 strum = { version = "0.27.1", default-features = false, features = ["derive"] }
 paste = "1.0.15"
 noto-sans-mono-bitmap = { version = "0.3.1", default-features = false, features = ["regular", "size_16", "unicode-basic-latin", "unicode-specials", "unicode-latin-1-supplement", "unicode-latin-extended-a"]}
+colorz = { version = "1.1.4", features = ["alloc"]}
 text-tables = { version = "0.4.0", git = "https://github.com/Julien-cpsn/text-table-rs" }
