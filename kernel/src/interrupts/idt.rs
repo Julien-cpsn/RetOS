@@ -1,7 +1,6 @@
 use crate::clock::tick_handler;
 use crate::interrupts::gdt;
 use crate::interrupts::interrupt::InterruptIndex;
-use crate::interrupts::pics::PICS;
 use crate::{hlt_loop, println, task};
 use pc_keyboard::layouts::{AnyLayout, Us104Key};
 use pc_keyboard::{HandleControl, Keyboard, ScancodeSet1};
@@ -9,11 +8,13 @@ use spin::{Lazy, RwLock};
 use x86_64::instructions::port::Port;
 use x86_64::registers::control::Cr2;
 use x86_64::structures::idt::{InterruptDescriptorTable, InterruptStackFrame, PageFaultErrorCode};
+use crate::devices::apic::LOCAL_APIC;
 
 /// Interrupt Descriptor Table.
 /// Data structure used by the x86 architecture to implement an interrupt vector table.
 pub static IDT: Lazy<InterruptDescriptorTable> = Lazy::new(|| {
     let mut idt = InterruptDescriptorTable::new();
+    
     idt.breakpoint.set_handler_fn(breakpoint_handler);
     idt.page_fault.set_handler_fn(page_fault_handler);
 
@@ -48,9 +49,9 @@ extern "x86-interrupt" fn timer_interrupt_handler(_stack_frame: InterruptStackFr
     tick_handler();
 
     unsafe {
-        PICS
-            .write()
-            .notify_end_of_interrupt(InterruptIndex::Timer.as_u8());
+        LOCAL_APIC
+            .lock()
+            .end_interrupt();
     }
 }
 
@@ -61,9 +62,9 @@ extern "x86-interrupt" fn keyboard_interrupt_handler(_stack_frame: InterruptStac
     task::keyboard::add_scancode(scancode);
 
     unsafe {
-        PICS
-            .write()
-            .notify_end_of_interrupt(InterruptIndex::Keyboard.as_u8());
+        LOCAL_APIC
+            .lock()
+            .end_interrupt();
     }
 }
 

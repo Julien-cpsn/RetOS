@@ -55,10 +55,19 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
     println!("{HELLO_WORLD}");
     println!();
 
-    /* --- Kernel initialization --- */
+    /* --- Memory pagination --- */
 
+    let physical_memory_offset = boot_info.physical_memory_offset.take().expect("No physical memory");
+    let physical_memory_offset = VirtAddr::new(physical_memory_offset);
+    let rsdp = boot_info.rsdp_addr.take().expect("Failed to get RSDP address") as usize;
+
+    MAPPER.call_once(|| Mutex::new(unsafe { memory::tables::init(physical_memory_offset) }));
+    MEMORY_REGIONS.call_once(|| Mutex::new(boot_info.memory_regions.to_vec()));
+    
+    /* --- Kernel initialization --- */
+    
     println!("Initializing kernel...");
-    retos_kernel::init();
+    retos_kernel::init(rsdp, physical_memory_offset);
     let post = unsafe { core::arch::x86_64::_rdtsc() };
     println!("Kernel initialized! ({} CPU cycles)", (post - pre) / 100_000);
     println!();
@@ -76,12 +85,6 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
         .expect("Could not initialize logger");
 
     set_max_level(LevelFilter::Off);
-
-    /* --- Memory pagination --- */
-
-    let physical_memory_offset = boot_info.physical_memory_offset.take().expect("No physical memory");
-    MAPPER.call_once(|| Mutex::new(unsafe { memory::tables::init(VirtAddr::new(physical_memory_offset)) }));
-    MEMORY_REGIONS.call_once(|| Mutex::new(boot_info.memory_regions.to_vec()));
     
     /* --- Kernel loop --- */
 

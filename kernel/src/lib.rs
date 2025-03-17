@@ -6,19 +6,20 @@
 
 extern crate alloc;
 
-use crate::interrupts::{gdt, idt};
+use devices::apic;
+use interrupts::{gdt, idt};
+use x86_64::VirtAddr;
 
 pub mod printer;
 pub mod interrupts;
 pub mod memory;
-pub mod allocator;
 pub mod task;
 pub mod terminal;
 pub mod clock;
 pub mod logger;
 pub mod devices;
 
-pub fn init() {
+pub fn init(rsdp: usize, physical_memory_offset: VirtAddr) {
     print!("\t> Initializing GDT... ");
     gdt::init_gdt();
     println!("initialized!");
@@ -27,13 +28,9 @@ pub fn init() {
     idt::init_idt();
     println!("initialized!");
 
-    print!("\t> Initializing PICS... ");
-    unsafe { interrupts::pics::PICS.write().initialize() };
+    print!("\t> Initializing APICs... ");
+    apic::init_apic(rsdp, physical_memory_offset);
     println!("initialized!");
-
-    print!("\t> Allocating heap... ");
-    allocator::init_allocator();
-    println!("allocated!");
 
     print!("\t> Enabling interrupts... ");
     x86_64::instructions::interrupts::enable();
