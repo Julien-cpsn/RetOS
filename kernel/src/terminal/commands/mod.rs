@@ -6,3 +6,4 @@ pub mod keyboard;
 pub mod uptime;
 pub mod lspci;
 pub mod scanpci;
+pub mod top;

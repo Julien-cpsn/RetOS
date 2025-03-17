@@ -4,10 +4,10 @@ use spin::Mutex;
 use x86_64::structures::paging::{FrameAllocator, FrameDeallocator, PageSize, PhysFrame, Size4KiB};
 use x86_64::PhysAddr;
 
-pub static BOOT_INFO_FRAME_ALLOCATOR: Mutex<BootInfoFrameAllocator> = Mutex::new(BootInfoFrameAllocator);
+pub static BOOT_INFO_FRAME_ALLOCATOR: Mutex<BootInfoFrameAllocator> = Mutex::new(BootInfoFrameAllocator(0));
 
 /// A FrameAllocator that returns usable frames from the bootloader's memory map.
-pub struct BootInfoFrameAllocator;
+pub struct BootInfoFrameAllocator(usize);
 
 unsafe impl<T: PageSize> FrameAllocator<T> for BootInfoFrameAllocator {
     fn allocate_frame(&mut self) -> Option<PhysFrame<T>> {
@@ -25,9 +25,13 @@ unsafe impl<T: PageSize> FrameAllocator<T> for BootInfoFrameAllocator {
         let frame_addresses = addr_ranges.flat_map(|r| r.step_by(T::SIZE as usize));
 
         // create `PhysFrame` types from the start addresses
-        frame_addresses
+        let frame = frame_addresses
             .map(|addr| PhysFrame::containing_address(PhysAddr::new(addr)))
-            .next()
+            .nth(self.0);
+        
+        self.0 += 1;
+
+        frame
     }
 }
 

@@ -1,6 +1,8 @@
 use core::ptr::addr_of;
 use spin::Lazy;
-use x86_64::registers::segmentation::{SegmentSelector, SS};
+use x86_64::instructions::segmentation::{Segment, DS, ES, FS, GS};
+use x86_64::instructions::tables::load_tss;
+use x86_64::registers::segmentation::{SegmentSelector, CS, SS};
 use x86_64::structures::gdt::{Descriptor, GlobalDescriptorTable};
 use x86_64::structures::tss::TaskStateSegment;
 use x86_64::VirtAddr;
@@ -26,24 +28,35 @@ pub static TSS: Lazy<TaskStateSegment> = Lazy::new(|| {
 /// Construct used by the x86 processor to configure segmented virtual memory
 pub static GDT: Lazy<(GlobalDescriptorTable, Selectors)> = Lazy::new(|| {
     let mut gdt = GlobalDescriptorTable::new();
+    
     let code_selector = gdt.append(Descriptor::kernel_code_segment());
+    let data_selector = gdt.append(Descriptor::kernel_data_segment());
     let tss_selector = gdt.append(Descriptor::tss_segment(&TSS));
-    (gdt, Selectors { code_selector, tss_selector })
+    
+    let selectors = Selectors {
+        code_selector,
+        data_selector,
+        tss_selector
+    };
+    
+    (gdt, selectors)
 });
 
 pub struct Selectors {
     code_selector: SegmentSelector,
+    data_selector: SegmentSelector,
     tss_selector: SegmentSelector,
 }
 
 pub fn init_gdt() {
-    use x86_64::instructions::tables::load_tss;
-    use x86_64::instructions::segmentation::{Segment, CS};
-
     GDT.0.load();
     unsafe {
         CS::set_reg(GDT.1.code_selector);
-        SS::set_reg(SegmentSelector(0));
+        SS::set_reg(GDT.1.data_selector);
+        DS::set_reg(GDT.1.data_selector);
+        ES::set_reg(GDT.1.data_selector);
+        FS::set_reg(GDT.1.data_selector);
+        GS::set_reg(GDT.1.data_selector);
         load_tss(GDT.1.tss_selector);
     }
 }

@@ -1,9 +1,9 @@
+> [!WARNING]
+> This is a PhD project, and it is still very WIP.
+
 # RetOS
 
 A Router Network Operating System. RetOS comes from *retis* which mean *network* in Latin.
-
-> [!WARNING]
-> This is a PhD project, and it is still very WIP.
 
 > [!NOTE]
 > This Operating System is based on the great [Writing an OS in Rust](https://os.phil-opp.com/) from [@phil-opp](https://github.com/phil-opp). 
@@ -41,17 +41,40 @@ By running the following command, you will build the OS images and the executabl
 cargo build --release
 ```
 
-If you need the images (`.img` files), you can find them like so:
+### Burn to hard drive/USB stick
+
+#### 1. Get the image path
+
+Build the OS and find the image file you want to use (BIOS or UEFI), you can do it like so:
 
 ```shell
-find ./target/release -name "retos-*.img"
+cargo build --release
+find ./target/release -maxdepth 1 -name "*.img"
 ```
+
+#### 2. Find the hard drive/USB stick
+
+You can find is by using the `lsblk` command. A possible selection for your device can be like `/dev/sda1`.
+
+#### 3. Burn the image
+
+Now you have to burn the image on the hard drive/USB stick with the following command:
+
+```shell
+dd if=<IMAGE_PATH> of=<DEVICE> bs=1M && sync
+```
+#### 4. Run it live!
+
+You can directly plug your device onto the PC and boot it :)
+
+> [!NOTE]
+> If you are using the BIOS image, you may want to enable CMS
 
 ## Done & TODOs
 
 - Core
-  - [ ] ANSII colors
   - [ ] Multi-threading
+  - [x] ANSI colors (WIP)
   - [x] Log system (with [goolog](https://github.com/Gooxey/goolog))
   - [x] Internal clock
   - [x] Command Line Interface (with [embedded-cli-rs](https://github.com/funbiscuit/embedded-cli-rs))
@@ -65,11 +88,12 @@ find ./target/release -name "retos-*.img"
   - [ ] NIC (E1000)
   - [ ] USB (maybe [rust-osdev/usb](https://github.com/rust-osdev/usb) or [usb-device](https://docs.rs/usb-device/latest/usb_device/index.html))
   - [ ] xHCI (maybe [rust-osdev/xhci](https://docs.rs/xhci/latest/xhci/))
-  - [ ] APIC (maybe [this merge request](https://github.com/rust-osdev/bootloader/pull/460/files))
+  - [x] APIC (with [this merge request](https://github.com/rust-osdev/bootloader/pull/460/files) but revisited)
   - [x] PCI (WIP with [pci_types](https://docs.rs/pci_types/0.10.0/pci_types/))
   - [x] PS2 Keyboard (with [pc_keyboard](https://github.com/rust-embedded-community/pc-keyboard))
-  - [x] PIC (with [pic8259](https://github.com/rust-osdev/pic8259))
+  - [x] Legacy PIC (with [pic8259](https://github.com/rust-osdev/pic8259))
 - Commands
+  - [x] top (WIP)
   - [x] scanpci
   - [x] lspci
   - [x] ps
@@ -86,7 +110,7 @@ find ./target/release -name "retos-*.img"
   - [x] Heap allocation (with [Talc](https://github.com/SFBdragon/talc))
   - [x] Memory pagination
 - Others
-  - [ ] Burn image to USB stick (maybe need [multiboot2](https://github.com/rust-osdev/multiboot2), [doc](https://docs.rs/multiboot2/latest/multiboot2/))
+  - [ ] multiboot2 (maybe need [multiboot2](https://github.com/rust-osdev/multiboot2), [doc](https://docs.rs/multiboot2/latest/multiboot2/))
   - [ ] Linux VM?
 
 ## Contributors

@@ -1,5 +1,6 @@
-use core::cmp::max;
+use crate::printer::color::{Color, DEFAULT_BACKGROUND, DEFAULT_FOREGROUND};
 use bootloader_api::info::{FrameBufferInfo, PixelFormat};
+use core::cmp::max;
 use core::fmt;
 use font_constants::BACKUP_CHAR;
 use noto_sans_mono_bitmap::{
@@ -10,7 +11,6 @@ use noto_sans_mono_bitmap::{
     RasterizedChar,
 };
 use spin::{Lazy, RwLock};
-use crate::printer::color::{Color, DEFAULT_BACKGROUND, DEFAULT_FOREGROUND};
 
 /// Additional vertical space between lines
 const LINE_SPACING: usize = 2;
@@ -47,6 +47,8 @@ pub static WRITER: Lazy<RwLock<Writer>> = Lazy::new(|| RwLock::new(Writer {
     y: BORDER_PADDING,
     fg_color: DEFAULT_FOREGROUND,
     bg_color: DEFAULT_BACKGROUND,
+    escape_sequence_level: 0,
+    escape_color_indicator: 0,
 }));
 
 /// Supports newline characters and implements the `core::fmt::Write` trait.
@@ -57,6 +59,8 @@ pub struct Writer {
     pub y: usize,
     pub fg_color: Color,
     pub bg_color: Color,
+    pub escape_sequence_level: u8,
+    pub escape_color_indicator: u8,
 }
 
 pub fn set_framebuffer(buffer: &'static mut [u8], info: FrameBufferInfo) {
@@ -137,6 +141,95 @@ impl Writer {
     #[inline]
     fn height(&self) -> usize {
         self.info.unwrap().height
+    }
+
+    pub fn write_byte(&mut self, byte: u8) {
+        let reset_escape_sequence = match self.escape_sequence_level {
+            0 => match byte {
+                // ESC
+                0x1B => None,
+
+                _ => Some(self.write_char(char::from(byte))),
+            },
+            1 => match byte {
+                // ESC[
+                0x5B => None,
+
+                _ => Some(())
+            },
+            2 => match byte {
+                // Backspace
+                0x44 => Some(self.erase_char()),
+
+                // First color first byte
+                0x30..=0x39 => {
+                    self.escape_color_indicator = byte;
+                    None
+                },
+
+                _ => Some(())
+            }
+            3 => match byte {
+                // ESC[2K
+                0x4B => Some(self.clear_line()),
+                // ESC[2J
+                0x4A => Some(self.clear()),
+
+                // First color second byte
+                0x30..=0x39 => {
+                    let color_byte = byte - 0x30;
+                    match self.escape_color_indicator {
+                        0x33 => self.fg_color = Color::from_ansi_aligned(color_byte, true),
+                        0x34 => self.bg_color = Color::from_ansi_aligned(color_byte, false),
+                        _ => {}
+                    }
+                    None
+                }
+
+                _ => Some(())
+            },
+            // First color has been used
+            4 if self.escape_color_indicator != 0 => match byte {
+                // ESC[__;
+                0x3B => None,
+
+                // ESC[__m
+                0x6D => Some(()),
+                _ => Some(())
+            }
+            5 => match byte {
+                // Second color first byte
+                0x30..=0x39 => {
+                    self.escape_color_indicator = byte;
+                    None
+                }
+                _ => Some(())
+            },
+            6 => match byte {
+                // Second color second byte
+                0x30..=0x39 => {
+                    let color_byte = byte - 0x30;
+                    match self.escape_color_indicator {
+                        0x33 => self.fg_color = Color::from_ansi_aligned(color_byte, true),
+                        0x34 => self.bg_color = Color::from_ansi_aligned(color_byte, false),
+                        _ => {}
+                    }
+                    None
+                }
+                _ => Some(())
+            },
+            7 => match byte {
+                // ESC[__;__m
+                0x6D => Some(()),
+                _ => Some(())
+            }
+            _ => Some(self.write_char(char::from(byte)))
+        };
+        
+        match reset_escape_sequence {
+            Some(_) => self.escape_sequence_level = 0,
+            None => self.escape_sequence_level += 1
+        }
     }
 
     /// Writes a single char to the framebuffer. Takes care of special control characters, such as
@@ -223,7 +316,7 @@ impl Writer {
 impl fmt::Write for Writer {
     fn write_str(&mut self, s: &str) -> fmt::Result {
         for c in s.chars() {
-            self.write_char(c);
+            self.write_byte(c as u8);
         }
         Ok(())
     }

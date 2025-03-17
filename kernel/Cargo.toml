@@ -10,7 +10,7 @@ x86_64 = "0.15.2"
 
 # Alloc
 spin = { version = "0.9.8", features = ["lazy"] }
-talc = "4.4.2"
+talc = { version = "4.4.2", features = ["counters"] }
 
 # Async
 crossbeam-queue = { version = "0.3.12", default-features = false, features = ["alloc", "nightly"] }
@@ -19,8 +19,8 @@ futures-util = { version = "0.3.31", default-features = false, features = ["allo
 # Devices
 pc-keyboard = "0.8.0"
 pic8259 = "0.11.0"
+acpi = "5.2.0"
 pci_types = "0.10.0"
-xhci = "0.9.2"
 
 # Cli
 embedded-cli = "0.2.1"
@@ -35,4 +35,5 @@ goolog = "0.11.0"
 strum = { version = "0.27.1", default-features = false, features = ["derive"] }
 paste = "1.0.15"
 noto-sans-mono-bitmap = { version = "0.3.1", default-features = false, features = ["regular", "size_16", "unicode-basic-latin", "unicode-specials", "unicode-latin-1-supplement", "unicode-latin-extended-a"]}
+colorz = { version = "1.1.4", features = ["alloc"]}
 text-tables = { version = "0.4.0", git = "https://github.com/Julien-cpsn/text-table-rs" }
