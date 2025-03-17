@@ -1,4 +1,4 @@
-use crate::devices::apic::PIC_1_OFFSET;
+use crate::devices::pic::pic::PIC_1_OFFSET;
 
 #[derive(Debug, Clone, Copy)]
 #[repr(u8)]

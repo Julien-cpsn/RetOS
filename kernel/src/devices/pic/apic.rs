@@ -1,18 +1,15 @@
-use crate::devices::acpi::AcpiHandlerImpl;
 use crate::interrupts::interrupt::InterruptIndex;
 use crate::memory::allocator::BOOT_INFO_FRAME_ALLOCATOR;
 use crate::memory::tables::MAPPER;
-use acpi::{AcpiTables, InterruptModel};
+use acpi::platform::interrupt;
+use alloc::alloc::Global;
 use core::ops::DerefMut;
 use core::ptr;
 use spin::Mutex;
 use x86_64::instructions::port::Port;
 use x86_64::structures::paging::{Mapper, Page, PageTableFlags, PhysFrame, Size4KiB};
 use x86_64::{PhysAddr, VirtAddr};
-
-pub const PIC_1_OFFSET: u8 = 0x20;
-
-pub static LOCAL_APIC: Mutex<Apic> = Mutex::new(Apic(ptr::null_mut()));
+use crate::devices::pic::pic::{PicType, PIC};
 
 #[allow(non_camel_case_types)]
 #[derive(Debug, Clone, Copy)]
@@ -85,32 +82,24 @@ pub enum APICOffset {
     R0x3F0 = 0x3F0,   // RESERVED = 0x3F0
 }
 
-pub fn init_apic(rsdp: usize, physical_memory_offset: VirtAddr) {
-    let handler = AcpiHandlerImpl::new(physical_memory_offset);
-    let acpi_tables = unsafe { AcpiTables::from_rsdp(handler, rsdp).expect("Failed to parse ACPI tables") };
-
-    let platform_info = acpi_tables
-        .platform_info()
-        .expect("Failed to get platform info");
-
-    if let InterruptModel::Apic(apic) = platform_info.interrupt_model {
-        Apic::init_io_apic(apic.io_apics[0].address as u64);
-        Apic::init_local_apic(apic.local_apic_address);
-    }
-
-    Apic::disable_pic();
-}
-
 pub struct Apic(*mut u32);
 
 unsafe impl Send for Apic {}
 unsafe impl Sync for Apic {}
 
 impl Apic {
+    pub fn init_apic(apic: interrupt::Apic<Global>) {
+        Apic::init_io_apic(apic.io_apics[0].address as u64);
+        Apic::init_local_apic(apic.local_apic_address);
+        Apic::disable_pic();
+    }
+    
     fn init_local_apic(local_apic_addr: u64) {
-        let virt_addr = Apic::map_apic(local_apic_addr);
-        let mut local_apic = LOCAL_APIC.lock();
+        PIC.call_once(|| Mutex::new(PicType::APIC(Apic(ptr::null_mut()))));
+        let mut pic = PIC.get().unwrap().lock();
+        let local_apic = pic.unwrap_apic();
 
+        let virt_addr = Apic::map_apic(local_apic_addr);
         local_apic.0 = virt_addr.as_mut_ptr::<u32>();
 
         unsafe {
@@ -176,7 +165,7 @@ impl Apic {
     fn disable_pic() {
         unsafe {
             // PIC2 (Slave PIC)
-            //Port::<u8>::new(0x21).write(0xFF);
+            Port::<u8>::new(0x21).write(0xFF);
             Port::<u8>::new(0xA1).write(0xFF);
         }
     }

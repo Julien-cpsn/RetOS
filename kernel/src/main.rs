@@ -43,26 +43,28 @@ bootloader_api::entry_point!(kernel_main, config = &BOOTLOADER_CONFIG);
 fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
     let pre = unsafe { core::arch::x86_64::_rdtsc() };
 
+    /* --- Gathering boot informations --- */
+    
+    let framebuffer = boot_info.framebuffer.as_mut().expect("No framebuffer");
+    let physical_memory_offset = VirtAddr::new(boot_info.physical_memory_offset.take().expect("No physical memory"));
+    let memory_regions = boot_info.memory_regions.to_vec();
+    let rsdp = boot_info.rsdp_addr.take().expect("Failed to get RSDP address") as usize;
+    
     /* --- Framebuffer initialization --- */
 
-    let framebuffer = boot_info.framebuffer.as_mut().expect("No framebuffer");
     let info = framebuffer.info();
     let buffer = framebuffer.buffer_mut();
     printer::buffer::set_framebuffer(buffer, info);
 
-    /* --------------------------------- */
+    /* --- Hello world --- */
 
     println!("{HELLO_WORLD}");
     println!();
 
     /* --- Memory pagination --- */
 
-    let physical_memory_offset = boot_info.physical_memory_offset.take().expect("No physical memory");
-    let physical_memory_offset = VirtAddr::new(physical_memory_offset);
-    let rsdp = boot_info.rsdp_addr.take().expect("Failed to get RSDP address") as usize;
-
     MAPPER.call_once(|| Mutex::new(unsafe { memory::tables::init(physical_memory_offset) }));
-    MEMORY_REGIONS.call_once(|| Mutex::new(boot_info.memory_regions.to_vec()));
+    MEMORY_REGIONS.call_once(|| Mutex::new(memory_regions));
     
     /* --- Kernel initialization --- */
     

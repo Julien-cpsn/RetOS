@@ -2,7 +2,7 @@
 name = "retos"
 version = "0.1.0"
 edition = "2021"
-default-run = "qemu_bios"
+default-run = "qemu_uefi"
 
 [workspace]
 members = ["kernel"]

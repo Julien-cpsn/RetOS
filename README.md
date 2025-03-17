@@ -91,7 +91,7 @@ You can directly plug your device onto the PC and boot it :)
   - [x] APIC (with [this merge request](https://github.com/rust-osdev/bootloader/pull/460/files) but revisited)
   - [x] PCI (WIP with [pci_types](https://docs.rs/pci_types/0.10.0/pci_types/))
   - [x] PS2 Keyboard (with [pc_keyboard](https://github.com/rust-embedded-community/pc-keyboard))
-  - [x] PIC (with [pic8259](https://github.com/rust-osdev/pic8259))
+  - [x] Legacy PIC (with [pic8259](https://github.com/rust-osdev/pic8259))
 - Commands
   - [x] top (WIP)
   - [x] scanpci
@@ -110,7 +110,7 @@ You can directly plug your device onto the PC and boot it :)
   - [x] Heap allocation (with [Talc](https://github.com/SFBdragon/talc))
   - [x] Memory pagination
 - Others
-  - [ ] Burn image to USB stick (maybe need [multiboot2](https://github.com/rust-osdev/multiboot2), [doc](https://docs.rs/multiboot2/latest/multiboot2/))
+  - [ ] multiboot2 (maybe need [multiboot2](https://github.com/rust-osdev/multiboot2), [doc](https://docs.rs/multiboot2/latest/multiboot2/))
   - [ ] Linux VM?
 
 ## Contributors

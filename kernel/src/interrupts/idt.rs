@@ -8,7 +8,7 @@ use spin::{Lazy, RwLock};
 use x86_64::instructions::port::Port;
 use x86_64::registers::control::Cr2;
 use x86_64::structures::idt::{InterruptDescriptorTable, InterruptStackFrame, PageFaultErrorCode};
-use crate::devices::apic::LOCAL_APIC;
+use crate::devices::pic::pic::PIC;
 
 /// Interrupt Descriptor Table.
 /// Data structure used by the x86 architecture to implement an interrupt vector table.
@@ -49,9 +49,11 @@ extern "x86-interrupt" fn timer_interrupt_handler(_stack_frame: InterruptStackFr
     tick_handler();
 
     unsafe {
-        LOCAL_APIC
+        PIC
+            .get()
+            .unwrap()
             .lock()
-            .end_interrupt();
+            .end_interrupt(InterruptIndex::Timer.as_u8());
     }
 }
 
@@ -62,9 +64,11 @@ extern "x86-interrupt" fn keyboard_interrupt_handler(_stack_frame: InterruptStac
     task::keyboard::add_scancode(scancode);
 
     unsafe {
-        LOCAL_APIC
+        PIC
+            .get()
+            .unwrap()
             .lock()
-            .end_interrupt();
+            .end_interrupt(InterruptIndex::Keyboard.as_u8());
     }
 }
 
