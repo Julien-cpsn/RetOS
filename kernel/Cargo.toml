@@ -10,7 +10,7 @@ x86_64 = "0.15.2"
 
 # Alloc
 spin = { version = "0.9.8", features = ["lazy"] }
-talc = "4.4.2"
+talc = { version = "4.4.2", features = ["counters"] }
 
 # Async
 crossbeam-queue = { version = "0.3.12", default-features = false, features = ["alloc", "nightly"] }

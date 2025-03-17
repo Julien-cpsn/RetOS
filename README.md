@@ -93,6 +93,7 @@ You can directly plug your device onto the PC and boot it :)
   - [x] PS2 Keyboard (with [pc_keyboard](https://github.com/rust-embedded-community/pc-keyboard))
   - [x] PIC (with [pic8259](https://github.com/rust-osdev/pic8259))
 - Commands
+  - [x] top (WIP)
   - [x] scanpci
   - [x] lspci
   - [x] ps

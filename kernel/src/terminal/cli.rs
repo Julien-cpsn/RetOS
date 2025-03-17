@@ -12,6 +12,7 @@ use crate::terminal::terminal::TerminalBuffer;
 use embedded_cli::cli::Cli;
 use embedded_cli::Command;
 use goolog::log::{set_max_level, LevelFilter};
+use crate::terminal::commands::top::top;
 
 add_verbosity! {
     #[derive(Command)]
@@ -40,6 +41,9 @@ add_verbosity! {
         /// Enforces PCI device scan
         Scanpci,
 
+        /// Print details about system resources usage
+        Top,
+        
         /// Print for how much time the system is running
         Uptime,
 
@@ -64,6 +68,7 @@ pub fn handle_command(cli: &mut Cli<&mut TerminalBuffer, CliError, [u8; 100], [u
                 Command::Keyboard { layout, .. } => change_layout(layout),
                 Command::Lspci { .. } => lspci(),
                 Command::Scanpci { .. } => scanpci(),
+                Command::Top { .. } => top(),
                 Command::Uptime { .. } => uptime(),
                 Command::Shutdown { .. } => shutdown(),
             }
