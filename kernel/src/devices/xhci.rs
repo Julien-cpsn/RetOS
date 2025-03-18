@@ -1,6 +1,4 @@
-use crate::devices::pci::PciClass::SerialBusController;
-use crate::devices::pci::SerialBusController::UsbController;
-use crate::devices::pci::{AnyPciSubclass, PciDevice, PCI_ACCESS};
+use crate::devices::pci::{PciDevice, PCI_ACCESS};
 use crate::memory::allocator::BOOT_INFO_FRAME_ALLOCATOR;
 use crate::memory::tables::MAPPER;
 use crate::println;
@@ -11,14 +9,11 @@ use pci_types::{Bar, CommandRegister, EndpointHeader, PciHeader};
 use spin::{Once, RwLock};
 use x86_64::structures::paging::{Mapper, Page, PageSize, PageTableFlags, PhysFrame, Size4KiB};
 use x86_64::{PhysAddr, VirtAddr};
-use xhci::context::Device;
 use xhci::extended_capabilities::List;
 use xhci::registers::capability::CapabilityParameters1;
-use xhci::ring::trb::event::TransferEvent;
-use xhci::ring::trb::transfer::{EventData, SetupStage, TransferType};
 use xhci::{accessor, ExtendedCapability, Registers};
 
-pub static HOST_USB_CONTROLLER: Once<Arc<RwLock<HostController>>> = Once::new();
+pub static XHCI_CONTROLLER: Once<Arc<RwLock<XhciHostController>>> = Once::new();
 
 #[derive(Clone, Debug)]
 pub struct MemoryMapper;
@@ -62,11 +57,6 @@ impl accessor::Mapper for MemoryMapper {
 }
 
 pub fn try_to_retrieve_xhci_registers(pci_device: &PciDevice) {
-    // If the device is not a USB controller
-    if pci_device.class != SerialBusController || pci_device.subclass != AnyPciSubclass::SerialBusController(UsbController) ||  pci_device.interface != 0x30 {
-        return;
-    }
-
     let pci_header = PciHeader::new(pci_device.address);
     let mut pci_endpoint_header = EndpointHeader::from_header(pci_header, &PCI_ACCESS).expect("Could not parse PCI endpoint header");
 
@@ -84,8 +74,8 @@ pub fn try_to_retrieve_xhci_registers(pci_device: &PciDevice) {
     let (bar_address, _bar_size) = bar0.unwrap_mem();
 
     let mapper = MemoryMapper;
-    HOST_USB_CONTROLLER.call_once(|| Arc::new(RwLock::new(HostController::new(bar_address, mapper))));
-    let mut host_usb_controller = HOST_USB_CONTROLLER.get().unwrap().write();
+    XHCI_CONTROLLER.call_once(|| Arc::new(RwLock::new(XhciHostController::new(bar_address, mapper))));
+    let mut host_usb_controller = XHCI_CONTROLLER.get().unwrap().write();
     
     /* ------- */
     let xhci = &mut host_usb_controller.registers;
@@ -102,37 +92,17 @@ pub fn try_to_retrieve_xhci_registers(pci_device: &PciDevice) {
             while !port.portsc.port_reset() {}
         }
     }
-
-    xhci.operational.crcr.write_volatile(*xhci.operational.crcr.read_volatile().set_ring_cycle_state());
-    println!("{}", xhci.operational.crcr.read_volatile().command_ring_running());
-
-    let device = Device::new_32byte();
-
-    // https://github.com/lihanrui2913/vmxkernel-os/blob/master/kernel/src/device/xhci.rs
-    // https://github.com/sonhs99/RedOS/tree/master/kernel/src/device/xhc
 }
 
-fn get_descriptor() {
-    let mut setup_data = SetupStage::new();
-    setup_data.set_request_type(0x00 | TransferType::In as u8);
-    setup_data.set_request(0x06);
-    setup_data.set_value((0x01 << 8) | 0x00);
-    setup_data.set_index(0);
-    setup_data.set_length(18);
-
-    let event_data = EventData::new();
-    let transfer_event = TransferEvent::new();
+pub struct XhciHostController {
+    pub registers: Registers<MemoryMapper>,
 }
 
-pub struct HostController {
-    registers: Registers<MemoryMapper>,
-}
-
-impl HostController {
-    pub fn new(mmio_base: usize, mapper: MemoryMapper) -> HostController {
+impl XhciHostController {
+    pub fn new(mmio_base: usize, mapper: MemoryMapper) -> XhciHostController {
         let mut registers = unsafe { Registers::new(mmio_base, mapper.clone()) };
 
-        HostController::request_host_controller_ownership(
+        XhciHostController::request_ownership(
             mmio_base,
             registers.capability.hccparams1.read_volatile(),
             mapper,
@@ -153,12 +123,12 @@ impl HostController {
         usbcmd.set_host_controller_reset();
         registers.operational.usbcmd.write_volatile(usbcmd);
 
-        HostController {
+        XhciHostController {
             registers
         }
     }
 
-    fn request_host_controller_ownership(mmio_base: usize, hccparams1: CapabilityParameters1, mapper: MemoryMapper) {
+    fn request_ownership(mmio_base: usize, hccparams1: CapabilityParameters1, mapper: MemoryMapper) {
         let mut extended_capabilities = unsafe { List::new(mmio_base, hccparams1, mapper.clone()) }.expect("The xHC does not support the xHCI Extended Capability.");
 
         for extended_capability in &mut extended_capabilities {

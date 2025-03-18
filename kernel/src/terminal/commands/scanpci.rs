@@ -1,10 +1,11 @@
 use alloc::string::{ToString};
 use alloc::sync::Arc;
-use crate::devices::pci::{parse_pci_subclass, PciClass, PciDevice, PCI_ACCESS, PCI_DEVICES};
+use crate::devices::pci::{parse_pci_subclass, AnyPciSubclass, PciClass, PciDevice, SerialBusController, PCI_ACCESS, PCI_DEVICES};
 use crate::terminal::error::CliError;
 use goolog::{debug, set_target, trace};
 use pci_types::{PciAddress, PciHeader};
 use spin::RwLock;
+use crate::devices::xhci::try_to_retrieve_xhci_registers;
 
 pub fn scanpci() -> Result<(), CliError> {
     set_target!("SCANPCI");
@@ -45,6 +46,19 @@ pub fn scanpci() -> Result<(), CliError> {
                     vendor_name: vendor_name.to_string(),
                     device_name: device_name.to_string(),
                 };
+                
+                match pci_device.class {
+                    PciClass::SerialBusController => match &pci_device.subclass  {
+                        AnyPciSubclass::SerialBusController(serial_bus_controller) if serial_bus_controller == &SerialBusController::UsbController => {
+                            // xHCI/USB controller
+                            if pci_device.interface == 0x30 {
+                                try_to_retrieve_xhci_registers(&pci_device);
+                            }
+                        }
+                        _ => {}
+                    },
+                    _ => {}
+                }
                 
                 debug!("Locking PCI_DEVICES mutex...");
                 PCI_DEVICES.write().insert(
