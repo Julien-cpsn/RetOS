@@ -5,6 +5,7 @@ use crate::devices::pic::pic::PIC_1_OFFSET;
 pub enum InterruptIndex {
     Timer = PIC_1_OFFSET,
     Keyboard,
+    NetworkPacket,
 }
 
 impl InterruptIndex {

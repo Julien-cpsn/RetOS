@@ -17,7 +17,7 @@ use retos_kernel::task::keyboard;
 use retos_kernel::task::task::Task;
 use retos_kernel::terminal::commands::scanpci::scanpci;
 use retos_kernel::{memory, printer, println};
-use spin::Mutex;
+use spin::{Mutex, RwLock};
 use x86_64::VirtAddr;
 
 const HELLO_WORLD: &str = r#"
@@ -63,7 +63,7 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
 
     /* --- Memory pagination --- */
 
-    MAPPER.call_once(|| Mutex::new(unsafe { memory::tables::init(physical_memory_offset) }));
+    MAPPER.call_once(|| RwLock::new(unsafe { memory::tables::init(physical_memory_offset) }));
     MEMORY_REGIONS.call_once(|| Mutex::new(memory_regions));
     
     /* --- Kernel initialization --- */
@@ -86,7 +86,7 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
     )
         .expect("Could not initialize logger");
 
-    set_max_level(LevelFilter::Off);
+    set_max_level(LevelFilter::Info);
     
     /* --- Kernel loop --- */
 

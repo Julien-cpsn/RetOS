@@ -37,3 +37,9 @@ impl MilliSecondClock {
         format!("{:02}:{:02}:{:02}.{:02}", hours % 60, minutes % 60, seconds % 60, now % 100)
     }
 }
+
+pub fn sleep(seconds: u32) {
+    let start = MilliSecondClock::seconds();
+    
+    while MilliSecondClock::seconds() - start < seconds {}
+}
