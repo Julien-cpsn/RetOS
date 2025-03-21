@@ -1,11 +1,11 @@
 use alloc::vec::Vec;
 use bootloader_api::info::MemoryRegion;
-use spin::{Mutex, Once};
+use spin::{Mutex, Once, RwLock};
 use x86_64::structures::paging::{OffsetPageTable, PageTable};
 use x86_64::{PhysAddr, VirtAddr};
 
 
-pub static MAPPER: Once<Mutex<OffsetPageTable<'static>>> = Once::new();
+pub static MAPPER: Once<RwLock<OffsetPageTable<'static>>> = Once::new();
 pub static MEMORY_REGIONS: Once<Mutex<Vec<MemoryRegion>>> = Once::new();
 
 /// Initialize a new OffsetPageTable.
@@ -43,8 +43,9 @@ unsafe fn active_level_4_table(physical_memory_offset: VirtAddr) -> &'static mut
 /// This function is unsafe because the caller must guarantee that the
 /// complete physical memory is mapped to virtual memory at the passed
 /// `physical_memory_offset`.
-pub fn translate_addr(addr: VirtAddr, physical_memory_offset: VirtAddr) -> Option<PhysAddr> {
-    translate_addr_inner(addr, physical_memory_offset)
+pub fn translate_addr(addr: VirtAddr) -> Option<PhysAddr> {
+    let mapper = MAPPER.get().unwrap().read();
+    translate_addr_inner(addr, mapper.phys_offset())
 }
 
 /// Private function that is called by `translate_addr`.

@@ -82,63 +82,77 @@ pub enum APICOffset {
     R0x3F0 = 0x3F0,   // RESERVED = 0x3F0
 }
 
-pub struct Apic(*mut u32);
+pub struct Apic {
+    io: *mut u32,
+    local: *mut u32
+}
 
 unsafe impl Send for Apic {}
 unsafe impl Sync for Apic {}
 
+impl Default for Apic {
+    fn default() -> Self {
+        Apic {
+            io: ptr::null_mut(),
+            local: ptr::null_mut(),
+        }
+    }
+}
+
 impl Apic {
     pub fn init_apic(apic: interrupt::Apic<Global>) {
+        PIC.call_once(|| Mutex::new(PicType::APIC(Apic::default())));
         Apic::init_io_apic(apic.io_apics[0].address as u64);
         Apic::init_local_apic(apic.local_apic_address);
         Apic::disable_pic();
     }
     
     fn init_local_apic(local_apic_addr: u64) {
-        PIC.call_once(|| Mutex::new(PicType::APIC(Apic(ptr::null_mut()))));
         let mut pic = PIC.get().unwrap().lock();
-        let local_apic = pic.unwrap_apic();
+        let apic = pic.unwrap_apic();
 
         let virt_addr = Apic::map_apic(local_apic_addr);
-        local_apic.0 = virt_addr.as_mut_ptr::<u32>();
+        apic.local = virt_addr.as_mut_ptr::<u32>();
 
         unsafe {
-            local_apic.init_timer();
-            local_apic.init_keyboard();
+            apic.init_timer();
+            apic.init_keyboard();
         }
     }
 
     fn init_io_apic(io_apic_address: u64) {
+        let mut pic = PIC.get().unwrap().lock();
+        let apic = pic.unwrap_apic();
+        
         let virt_addr = Apic::map_apic(io_apic_address);
+        apic.io = virt_addr.as_mut_ptr::<u32>();
 
-        let io_apic_pointer = virt_addr.as_mut_ptr::<u32>();
+        apic.register_interrupt(0x12, InterruptIndex::Keyboard);
+    }
 
+    pub fn register_interrupt(&self, offset: u32, index: InterruptIndex) {
         unsafe {
-            io_apic_pointer
-                .offset(0)
-                .write_volatile(0x12);
-            io_apic_pointer
-                .offset(4)
-                .write_volatile(InterruptIndex::Keyboard.as_u8() as u32);
+            self.io.offset(0).write_volatile(offset);
+            self.io.offset(4).write_volatile(index.as_u8() as u32);
         }
     }
 
     unsafe fn init_timer(&self) {
-        let svr = self.0.offset(APICOffset::Svr as isize / 4);
+        let svr = self.local.offset(APICOffset::Svr as isize / 4);
         svr.write_volatile(svr.read_volatile() | 0x100); // Set bit 8
 
-        let lvt_lint1 = self.0.offset(APICOffset::LvtT as isize / 4);
+        let lvt_lint1 = self.local.offset(APICOffset::LvtT as isize / 4);
         lvt_lint1.write_volatile(0x20 | (1 << 17)); // Vector 0x20, periodic mode
 
-        let tdcr = self.0.offset(APICOffset::Tdcr as isize / 4);
+        let tdcr = self.local.offset(APICOffset::Tdcr as isize / 4);
         tdcr.write_volatile(0x3); // Divide by 16 mode
 
-        let ticr = self.0.offset(APICOffset::Ticr as isize / 4);
+        let ticr = self.local.offset(APICOffset::Ticr as isize / 4);
         ticr.write_volatile(0x100000); // An arbitrary value for the initial value of the timer
     }
 
     unsafe fn init_keyboard(&self) {
-        let keyboard_register = self.0.offset(APICOffset::LvtLint1 as isize / 4);
+        let keyboard_register = self.local.offset(APICOffset::LvtLint1 as isize / 4);
         keyboard_register.write_volatile(InterruptIndex::Keyboard as u8 as u32);
     }
 
@@ -146,7 +160,7 @@ impl Apic {
         let page: Page<Size4KiB> = Page::containing_address(VirtAddr::new(physical_address));
         let frame = PhysFrame::containing_address(PhysAddr::new(physical_address));
         
-        let mut mapper = MAPPER.get().unwrap().lock();
+        let mut mapper = MAPPER.get().unwrap().write();
         let mut frame_allocator = BOOT_INFO_FRAME_ALLOCATOR.lock();
 
         let flags = PageTableFlags::PRESENT | PageTableFlags::WRITABLE | PageTableFlags::NO_CACHE;
@@ -171,7 +185,8 @@ impl Apic {
     }
 
     pub unsafe fn end_interrupt(&mut self) {
-        self.0
+        self
+            .local
             .offset(APICOffset::Eoi as isize / 4)
             .write_volatile(0)
     }

@@ -3,3 +3,6 @@
 
 # IDEs
 /.idea
+
+# Wireshark network traffic
+dump.pcap

@@ -14,7 +14,7 @@ talc = { version = "4.4.2", features = ["counters"] }
 
 # Async
 crossbeam-queue = { version = "0.3.12", default-features = false, features = ["alloc", "nightly"] }
-futures-util = { version = "0.3.31", default-features = false, features = ["alloc"] }
+futures-util = { version = "0.3.31", default-features = false, features = ["alloc", "async-await", "sink"] }
 
 # Devices
 pc-keyboard = "0.8.0"
@@ -33,7 +33,7 @@ thiserror = { version = "2.0.12", default-features = false }
 goolog = "0.11.0"
 
 # Utils
-bit_field = "0.10.2"
+accessor = "0.3.3"
 strum = { version = "0.27.1", default-features = false, features = ["derive"] }
 paste = "1.0.15"
 noto-sans-mono-bitmap = { version = "0.3.1", default-features = false, features = ["regular", "size_16", "unicode-basic-latin", "unicode-specials", "unicode-latin-1-supplement", "unicode-latin-extended-a"]}

@@ -5,6 +5,7 @@ use x86_64::VirtAddr;
 use crate::devices::acpi::AcpiHandlerImpl;
 use crate::devices::pic::apic::Apic;
 use crate::devices::pic::legacy::init_legacy_pics;
+use crate::interrupts::interrupt::InterruptIndex;
 use crate::print;
 
 pub static PIC: Once<Mutex<PicType>> = Once::new();
@@ -32,10 +33,19 @@ impl PicType {
         }
     }
 
-    pub unsafe fn end_interrupt(&mut self, interrupt_id: u8) {
+    pub fn register_interrupt(&self, offset: u32, index: InterruptIndex) {
         match self {
-            PicType::APIC(apic) => apic.end_interrupt(),
-            PicType::PICS(pics) => pics.notify_end_of_interrupt(interrupt_id)
+            PicType::APIC(apic) => apic.register_interrupt(offset, index),
+            PicType::PICS(_) => todo!()
+        }
+    }
+    
+    pub fn end_interrupt(&mut self, interrupt_id: u8) {
+        unsafe {
+            match self {
+                PicType::APIC(apic) => apic.end_interrupt(),
+                PicType::PICS(pics) => pics.notify_end_of_interrupt(interrupt_id)
+            }
         }
     }
 }

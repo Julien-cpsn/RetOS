@@ -85,8 +85,9 @@ You can directly plug your device onto the PC and boot it :)
   - [x] Standalone kernel
 - Devices
   - [ ] VirtIO? (maybe [rust-osdev/virtio](https://docs.rs/virtio-spec/latest/virtio_spec/))
-  - [ ] NIC (E1000)
   - [ ] USB (maybe [rust-osdev/usb](https://github.com/rust-osdev/usb) or [usb-device](https://docs.rs/usb-device/latest/usb_device/index.html))
+  - [x] NIC E1000 (WIP)
+  - [x] NIC RTL8139 (with [my fork](https://github.com/Julien-cpsn/rtl8139-rs) of [rtl8139-rs](https://github.com/vgarleanu/rtl8139-rs))
   - [x] xHCI (WIP, with [rust-osdev/xhci](https://docs.rs/xhci/latest/xhci/))
   - [x] APIC (with [this merge request](https://github.com/rust-osdev/bootloader/pull/460/files) but revisited)
   - [x] PCI (WIP with [pci_types](https://docs.rs/pci_types/0.10.0/pci_types/))
