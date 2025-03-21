@@ -11,6 +11,7 @@ use noto_sans_mono_bitmap::{
     RasterizedChar,
 };
 use spin::{Lazy, RwLock};
+use crate::printer::buffer::font_constants::{DEFAULT_DIM_FACTOR, DEFAULT_FONT_WEIGHT};
 
 /// Additional vertical space between lines
 const LINE_SPACING: usize = 2;
@@ -35,7 +36,8 @@ mod font_constants {
     /// The '�' character requires the feature "unicode-specials".
     pub const BACKUP_CHAR: char = '�';
 
-    pub const FONT_WEIGHT: FontWeight = FontWeight::Regular;
+    pub const DEFAULT_FONT_WEIGHT: FontWeight = FontWeight::Regular;
+    pub const DEFAULT_DIM_FACTOR: u16 = 1;
 }
 
 /// A global `Writer` instance.
@@ -49,6 +51,8 @@ pub static WRITER: Lazy<RwLock<Writer>> = Lazy::new(|| RwLock::new(Writer {
     bg_color: DEFAULT_BACKGROUND,
     escape_sequence_level: 0,
     escape_color_indicator: 0,
+    font_weight: DEFAULT_FONT_WEIGHT,
+    dim_factor: DEFAULT_DIM_FACTOR
 }));
 
 /// Supports newline characters and implements the `core::fmt::Write` trait.
@@ -61,6 +65,8 @@ pub struct Writer {
     pub bg_color: Color,
     pub escape_sequence_level: u8,
     pub escape_color_indicator: u8,
+    pub font_weight: FontWeight,
+    pub dim_factor: u16,
 }
 
 pub fn set_framebuffer(buffer: &'static mut [u8], info: FrameBufferInfo) {
@@ -68,18 +74,6 @@ pub fn set_framebuffer(buffer: &'static mut [u8], info: FrameBufferInfo) {
     writer.framebuffer = Some(buffer);
     writer.info = Some(info);
     writer.clear();
-}
-
-/// Returns the raster of the given char or the raster of [`font_constants::BACKUP_CHAR`].
-fn get_char_raster(c: char) -> RasterizedChar {
-    fn get(c: char) -> Option<RasterizedChar> {
-        get_raster(
-            c,
-            font_constants::FONT_WEIGHT,
-            font_constants::CHAR_RASTER_HEIGHT,
-        )
-    }
-    get(c).unwrap_or_else(|| get(BACKUP_CHAR).expect("Should get raster of backup char."))
 }
 
 impl Writer {
@@ -162,6 +156,7 @@ impl Writer {
                 0x44 => Some(self.erase_char()),
 
                 // First color first byte
+                // ESC[_
                 0x30..=0x39 => {
                     self.escape_color_indicator = byte;
                     None
@@ -176,6 +171,7 @@ impl Writer {
                 0x4A => Some(self.clear()),
 
                 // First color second byte
+                // ESC[__
                 0x30..=0x39 => {
                     let color_byte = byte - 0x30;
                     match self.escape_color_indicator {
@@ -183,6 +179,20 @@ impl Writer {
                         0x34 => self.bg_color = Color::from_ansi_aligned(color_byte, false),
                         _ => {}
                     }
+                    None
+                }
+
+                // ESC[_m
+                0x6D => {
+                    self.handle_graphic_mode();
+                    Some(())
+                },
+
+                // ESC[_;
+                0x3B => {
+                    self.handle_graphic_mode();
+                    // Little hack
+                    self.escape_sequence_level += 1;
                     None
                 }
 
@@ -199,6 +209,7 @@ impl Writer {
             }
             5 => match byte {
                 // Second color first byte
+                // ESC[__;_
                 0x30..=0x39 => {
                     self.escape_color_indicator = byte;
                     None
@@ -207,6 +218,7 @@ impl Writer {
             },
             6 => match byte {
                 // Second color second byte
+                // ESC[__;__
                 0x30..=0x39 => {
                     let color_byte = byte - 0x30;
                     match self.escape_color_indicator {
@@ -221,6 +233,39 @@ impl Writer {
             7 => match byte {
                 // ESC[__;__m
                 0x6D => Some(()),
+
+                // ESC[__;__;
+                0x3B => None,
+
+                _ => Some(())
+            },
+            8 => match byte {
+                // Third color first byte
+                // ESC[__;__;_
+                0x30..=0x39 => {
+                    self.escape_color_indicator = byte;
+                    None
+                },
+                _ => Some(())
+            },
+            9 => match byte {
+                // Third color second byte
+                // ESC[__;__;__
+                0x30..=0x39 => {
+                    let color_byte = byte - 0x30;
+                    match self.escape_color_indicator {
+                        0x33 => self.fg_color = Color::from_ansi_aligned(color_byte, true),
+                        0x34 => self.bg_color = Color::from_ansi_aligned(color_byte, false),
+                        _ => {}
+                    }
+                    None
+                }
+                _ => Some(())
+            },
+            10 => match byte {
+                // ESC[__;__m
+                0x6D => Some(()),
+
                 _ => Some(())
             }
             _ => Some(self.write_char(char::from(byte)))
@@ -248,7 +293,7 @@ impl Writer {
                     self.clear();
                 }
                 for _ in 0..4 {
-                    self.write_rendered_char(get_char_raster(' '));
+                    self.write_rendered_char(self.get_char_raster(' '));
                 }
             },
             c => {
@@ -260,7 +305,7 @@ impl Writer {
                 if next_y >= self.height() {
                     self.clear();
                 }
-                self.write_rendered_char(get_char_raster(c));
+                self.write_rendered_char(self.get_char_raster(c));
             }
         }
     }
@@ -281,9 +326,9 @@ impl Writer {
     fn blend(&self, alpha: u8) -> (u8, u8, u8) {
         let inv_alpha = 255 - alpha;
 
-        let out_r = ((self.fg_color.r as u16 * alpha as u16 + self.bg_color.r as u16 * inv_alpha as u16) / 255) as u8;
-        let out_g = ((self.fg_color.g as u16 * alpha as u16 + self.bg_color.g as u16 * inv_alpha as u16) / 255) as u8;
-        let out_b = ((self.fg_color.b as u16 * alpha as u16 + self.bg_color.b as u16 * inv_alpha as u16) / 255) as u8;
+        let out_r = (((self.fg_color.r as u16 * alpha as u16 + self.bg_color.r as u16 * inv_alpha as u16) / 255) / self.dim_factor) as u8;
+        let out_g = (((self.fg_color.g as u16 * alpha as u16 + self.bg_color.g as u16 * inv_alpha as u16) / 255) / self.dim_factor) as u8;
+        let out_b = (((self.fg_color.b as u16 * alpha as u16 + self.bg_color.b as u16 * inv_alpha as u16) / 255) / self.dim_factor) as u8;
 
         // Pack result
         (out_r, out_g, out_b)
@@ -309,6 +354,52 @@ impl Writer {
             buffer[byte_offset..(byte_offset + bytes_per_pixel)].copy_from_slice(&color[..bytes_per_pixel]);
 
             let _ = *&buffer[byte_offset];
+        }
+    }
+
+    /// Returns the raster of the given char or the raster of [`font_constants::BACKUP_CHAR`].
+    fn get_char_raster(&self, c: char) -> RasterizedChar {
+        get_raster(
+            c,
+            self.font_weight,
+            font_constants::CHAR_RASTER_HEIGHT,
+        )
+            .unwrap_or_else(|| {
+                get_raster(
+                    BACKUP_CHAR,
+                    self.font_weight,
+                    font_constants::CHAR_RASTER_HEIGHT,
+                )
+                    .expect("Should get raster of backup char.")
+            })
+    }
+
+    fn handle_graphic_mode(&mut self) {
+        match self.escape_color_indicator - 0x30 {
+            // Reset all
+            0x0 => {
+                self.fg_color = DEFAULT_FOREGROUND;
+                self.bg_color = DEFAULT_BACKGROUND;
+                self.font_weight = DEFAULT_FONT_WEIGHT;
+                self.dim_factor = DEFAULT_DIM_FACTOR;
+            },
+            // Bold
+            0x1 => self.font_weight = FontWeight::Bold,
+            // Dim
+            0x2 => self.dim_factor = 2,
+            // Italic
+            0x3 => {}
+            // Underline
+            0x4 => {}
+            // Blink
+            0x5 => {}
+            // Reverse
+            0x7 => {}
+            // Hidden
+            0x8 => {}
+            // Strike
+            0x9 => {}
+            _ => {}
         }
     }
 }
