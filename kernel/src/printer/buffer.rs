@@ -1,3 +1,4 @@
+use alloc::vec::Vec;
 use crate::printer::color::{Color, DEFAULT_BACKGROUND, DEFAULT_FOREGROUND};
 use bootloader_api::info::{FrameBufferInfo, PixelFormat};
 use core::cmp::max;
@@ -49,8 +50,9 @@ pub static WRITER: Lazy<RwLock<Writer>> = Lazy::new(|| RwLock::new(Writer {
     y: BORDER_PADDING,
     fg_color: DEFAULT_FOREGROUND,
     bg_color: DEFAULT_BACKGROUND,
-    escape_sequence_level: 0,
-    escape_color_indicator: 0,
+    escape_state: EscapeState::None,
+    escape_params: Vec::with_capacity(8),
+    current_param: 0,
     font_weight: DEFAULT_FONT_WEIGHT,
     dim_factor: DEFAULT_DIM_FACTOR
 }));
@@ -63,10 +65,18 @@ pub struct Writer {
     pub y: usize,
     pub fg_color: Color,
     pub bg_color: Color,
-    pub escape_sequence_level: u8,
-    pub escape_color_indicator: u8,
+    pub escape_state: EscapeState,
+    pub escape_params: Vec<u16>,
+    pub current_param: u16,
     pub font_weight: FontWeight,
     pub dim_factor: u16,
+}
+
+#[derive(PartialEq, Eq, Clone, Copy)]
+pub enum EscapeState {
+    None,
+    Escape,
+    CSI,
 }
 
 pub fn set_framebuffer(buffer: &'static mut [u8], info: FrameBufferInfo) {
@@ -138,144 +148,70 @@ impl Writer {
     }
 
     pub fn write_byte(&mut self, byte: u8) {
-        let reset_escape_sequence = match self.escape_sequence_level {
-            0 => match byte {
+        match self.escape_state {
+            EscapeState::None => {
                 // ESC
-                0x1B => None,
-
-                _ => Some(self.write_char(char::from(byte))),
+                if byte == 0x1B {
+                    self.escape_state = EscapeState::Escape;
+                } else {
+                    self.write_char(char::from(byte));
+                }
             },
-            1 => match byte {
-                // ESC[
-                0x5B => None,
-
-                _ => Some(())
+            EscapeState::Escape => {
+                // [
+                if byte == 0x5B {
+                    self.escape_state = EscapeState::CSI;
+                    self.escape_params.clear();
+                    self.current_param = 0;
+                } else {
+                    self.escape_state = EscapeState::None;
+                    self.write_char(char::from(byte));
+                }
             },
-            2 => match byte {
-                // Backspace
-                0x44 => Some(self.erase_char()),
+            EscapeState::CSI => {
+                match byte {
+                    b'0'..=b'9' => {
+                        self.current_param = self.current_param * 10 + (byte - b'0') as u16;
+                    },
+                    b';' => {
+                        self.escape_params.push(self.current_param);
+                        self.current_param = 0;
+                    },
+                    // Terminal commands
+                    b'K' => {
+                        if self.escape_params.len() == 1 && self.escape_params[0] == 2 {
+                            self.clear_line();
+                        }
+                        self.escape_state = EscapeState::None;
+                    },
+                    b'J' => {
+                        if self.escape_params.len() == 1 && self.escape_params[0] == 2 {
+                            self.clear();
+                        }
+                        self.escape_state = EscapeState::None;
+                    },
+                    b'D' => { // Backspace
+                        self.erase_char();
+                        self.escape_state = EscapeState::None;
+                    },
+                    b'm' => {
+                        // Push the last parameter if it exists
+                        if self.current_param > 0 || self.escape_params.is_empty() {
+                            self.escape_params.push(self.current_param);
+                        }
 
-                // First color first byte
-                // ESC[_
-                0x30..=0x39 => {
-                    self.escape_color_indicator = byte;
-                    None
-                },
-
-                _ => Some(())
-            }
-            3 => match byte {
-                // ESC[2K
-                0x4B => Some(self.clear_line()),
-                // ESC[2J
-                0x4A => Some(self.clear()),
-
-                // First color second byte
-                // ESC[__
-                0x30..=0x39 => {
-                    let color_byte = byte - 0x30;
-                    match self.escape_color_indicator {
-                        0x33 => self.fg_color = Color::from_ansi_aligned(color_byte, true),
-                        0x34 => self.bg_color = Color::from_ansi_aligned(color_byte, false),
-                        _ => {}
+                        self.process_sgr_params();
+                        self.escape_state = EscapeState::None;
+                    },
+                    _ => {
+                        // Unknown sequence, just reset
+                        self.escape_state = EscapeState::None;
                     }
-                    None
                 }
-
-                // ESC[_m
-                0x6D => {
-                    self.handle_graphic_mode();
-                    Some(())
-                },
-
-                // ESC[_;
-                0x3B => {
-                    self.handle_graphic_mode();
-                    // Little hack
-                    self.escape_sequence_level += 1;
-                    None
-                }
-
-                _ => Some(())
-            },
-            // First color has been used
-            4 if self.escape_color_indicator != 0 => match byte {
-                // ESC[__;
-                0x3B => None,
-
-                // ESC[__m
-                0x6D => Some(()),
-                _ => Some(())
             }
-            5 => match byte {
-                // Second color first byte
-                // ESC[__;_
-                0x30..=0x39 => {
-                    self.escape_color_indicator = byte;
-                    None
-                }
-                _ => Some(())
-            },
-            6 => match byte {
-                // Second color second byte
-                // ESC[__;__
-                0x30..=0x39 => {
-                    let color_byte = byte - 0x30;
-                    match self.escape_color_indicator {
-                        0x33 => self.fg_color = Color::from_ansi_aligned(color_byte, true),
-                        0x34 => self.bg_color = Color::from_ansi_aligned(color_byte, false),
-                        _ => {}
-                    }
-                    None
-                }
-                _ => Some(())
-            },
-            7 => match byte {
-                // ESC[__;__m
-                0x6D => Some(()),
-
-                // ESC[__;__;
-                0x3B => None,
-
-                _ => Some(())
-            },
-            8 => match byte {
-                // Third color first byte
-                // ESC[__;__;_
-                0x30..=0x39 => {
-                    self.escape_color_indicator = byte;
-                    None
-                },
-                _ => Some(())
-            },
-            9 => match byte {
-                // Third color second byte
-                // ESC[__;__;__
-                0x30..=0x39 => {
-                    let color_byte = byte - 0x30;
-                    match self.escape_color_indicator {
-                        0x33 => self.fg_color = Color::from_ansi_aligned(color_byte, true),
-                        0x34 => self.bg_color = Color::from_ansi_aligned(color_byte, false),
-                        _ => {}
-                    }
-                    None
-                }
-                _ => Some(())
-            },
-            10 => match byte {
-                // ESC[__;__m
-                0x6D => Some(()),
-
-                _ => Some(())
-            }
-            _ => Some(self.write_char(char::from(byte)))
-        };
-        
-        match reset_escape_sequence {
-            Some(_) => self.escape_sequence_level = 0,
-            None => self.escape_sequence_level += 1
         }
     }
+
 
     /// Writes a single char to the framebuffer. Takes care of special control characters, such as
     /// newlines and carriage returns.
@@ -374,33 +310,61 @@ impl Writer {
             })
     }
 
-    fn handle_graphic_mode(&mut self) {
-        match self.escape_color_indicator - 0x30 {
-            // Reset all
-            0x0 => {
-                self.fg_color = DEFAULT_FOREGROUND;
-                self.bg_color = DEFAULT_BACKGROUND;
-                self.font_weight = DEFAULT_FONT_WEIGHT;
-                self.dim_factor = DEFAULT_DIM_FACTOR;
-            },
-            // Bold
-            0x1 => self.font_weight = FontWeight::Bold,
-            // Dim
-            0x2 => self.dim_factor = 2,
-            // Italic
-            0x3 => {}
-            // Underline
-            0x4 => {}
-            // Blink
-            0x5 => {}
-            // Reverse
-            0x7 => {}
-            // Hidden
-            0x8 => {}
-            // Strike
-            0x9 => {}
-            _ => {}
+    fn process_sgr_params(&mut self) {
+        if self.escape_params.is_empty() {
+            // Reset all attributes if no parameters
+            self.reset_attributes();
+            return;
         }
+
+        let mut i = 0;
+        while i < self.escape_params.len() {
+            match self.escape_params[i] {
+                // Reset
+                0 => self.reset_attributes(),
+                // Bold
+                1 => self.font_weight = FontWeight::Bold,
+                // Dim
+                2 => self.dim_factor = 2,
+                // Italic
+                3 => {},
+                // Underline
+                4 => {},
+                // Blink
+                5 => {},
+                // Reverse
+                7 => {},
+                // Hidden
+                8 => {},
+                // Strike
+                9 => {}, 
+                // Fg color
+                30..=37 => self.fg_color = Color::from_ansi_aligned((self.escape_params[i] - 30) as u8, true),
+                // Bg color
+                40..=47 => self.bg_color = Color::from_ansi_aligned((self.escape_params[i] - 40) as u8, false),
+                38 | 48 => {
+                    // Extended color processing (38;5;n or 48;5;n)
+                    if i + 2 < self.escape_params.len() && self.escape_params[i+1] == 5 {
+                        let color_byte = self.escape_params[i+2] as u8;
+                        if self.escape_params[i] == 38 {
+                            self.fg_color = Color::from_ansi_aligned(color_byte, true);
+                        } else {
+                            self.bg_color = Color::from_ansi_aligned(color_byte, false);
+                        }
+                        i += 2;
+                    }
+                },
+                _ => {}
+            }
+            i += 1;
+        }
+    }
+    
+    fn reset_attributes(&mut self) {
+        self.fg_color = DEFAULT_FOREGROUND;
+        self.bg_color = DEFAULT_BACKGROUND;
+        self.font_weight = DEFAULT_FONT_WEIGHT;
+        self.dim_factor = DEFAULT_DIM_FACTOR;
     }
 }
 
