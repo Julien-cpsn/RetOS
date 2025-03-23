@@ -3,10 +3,12 @@ use crate::printer::buffer::WRITER;
 use crate::terminal::error::CliError;
 use alloc::string::{String, ToString};
 use alloc::{format, vec};
-use goolog::set_target;
+use goolog::{trace};
+
+const GOOLOG_TARGET: &str = "LSPCI";
 
 pub fn lspci() -> Result<(), CliError> {
-    set_target!("LSPCI");
+    trace!("LSPCI");
 
     let mut table = vec![
         [String::from("Bus:Device.Function"), String::from("Vendor"), String::from("Device name"), String::from("Revision"), String::from("Class"), String::from("Subclass")]

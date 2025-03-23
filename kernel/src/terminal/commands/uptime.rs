@@ -1,11 +1,13 @@
 use crate::clock::MilliSecondClock;
 use crate::println;
 use crate::terminal::error::CliError;
-use goolog::set_target;
+use goolog::{trace};
+
+const GOOLOG_TARGET: &str = "UTPIME";
 
 pub fn uptime() -> Result<(), CliError> {
-    set_target!("UPTIME");
-
+    trace!("UPTIME");
+    
     println!("{}", MilliSecondClock::format());
     Ok(())
 }

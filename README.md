@@ -98,7 +98,7 @@ You can directly plug your device onto the PC and boot it :)
   - [x] scanpci
   - [x] lspci
   - [x] ps
-  - [x] shutdown (WIP)
+  - [x] shutdown (with [qemu-exit](https://github.com/rust-embedded/qemu-exit))
   - [x] keyboard (change keyboard layout)
   - [x] uptime
   - [x] clear

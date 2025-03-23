@@ -1,11 +1,13 @@
-use goolog::{debug, set_target};
+use goolog::{debug, trace};
 use crate::println;
 use crate::task::executor::TASKS;
 use crate::terminal::error::CliError;
 
-pub fn ps() -> Result<(), CliError> {
-    set_target!("PS");
+const GOOLOG_TARGET: &str = "PS";
 
+pub fn ps() -> Result<(), CliError> {
+    trace!("PS");
+    
     debug!("Locking TASKS_MIRROR mutex...");
     let tasks = TASKS.read();
     debug!("TASKS_MIRROR mutex locked");

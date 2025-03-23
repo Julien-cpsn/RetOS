@@ -40,3 +40,4 @@ paste = "1.0.15"
 noto-sans-mono-bitmap = { version = "0.3.1", default-features = false, features = ["regular", "size_16", "bold", "unicode-basic-latin", "unicode-specials", "unicode-latin-1-supplement", "unicode-latin-extended-a"]}
 yansi = { version = "1.0.1", default-features = false, features = ["alloc"]}
 text-tables = { version = "0.4.0", git = "https://github.com/Julien-cpsn/text-table-rs" }
+qemu-exit = "3.0.2"

@@ -2,15 +2,17 @@ use alloc::string::{ToString};
 use alloc::sync::Arc;
 use crate::devices::pci::{parse_pci_subclass, AnyPciSubclass, NetworkController, PciClass, PciDevice, SerialBusController, PCI_ACCESS, PCI_DEVICES};
 use crate::terminal::error::CliError;
-use goolog::{debug, set_target, trace};
+use goolog::{debug, trace};
 use pci_types::{PciAddress, PciHeader};
 use spin::RwLock;
 use crate::devices::drivers::e1000::{init_e1000, E1000_DEVICE_ID};
 use crate::devices::drivers::rtl8139::{init_rtl8139, RTL8139_DEVICE_ID};
 use crate::devices::xhci::try_to_retrieve_xhci_registers;
 
+const GOOLOG_TARGET: &str = "SCANPCI";
+
 pub fn scanpci() -> Result<(), CliError> {
-    set_target!("SCANPCI");
+    trace!("SCANPCI");
     
     debug!("Locking PCI_DEVICES mutex...");
     PCI_DEVICES.write().clear();
