@@ -33,6 +33,7 @@ thiserror = { version = "2.0.12", default-features = false }
 goolog = "0.11.0"
 
 # Utils
+smallvec = "1.14.0"
 accessor = "0.3.3"
 strum = { version = "0.27.1", default-features = false, features = ["derive"] }
 paste = "1.0.15"

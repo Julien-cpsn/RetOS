@@ -1,18 +1,12 @@
-use alloc::vec::Vec;
+use crate::printer::buffer::font_constants::{DEFAULT_DIM_FACTOR, DEFAULT_FONT_WEIGHT};
 use crate::printer::color::{Color, DEFAULT_BACKGROUND, DEFAULT_FOREGROUND};
 use bootloader_api::info::{FrameBufferInfo, PixelFormat};
 use core::cmp::max;
 use core::fmt;
 use font_constants::BACKUP_CHAR;
-use noto_sans_mono_bitmap::{
-    get_raster,
-    get_raster_width,
-    FontWeight,
-    RasterHeight,
-    RasterizedChar,
-};
+use noto_sans_mono_bitmap::{get_raster,get_raster_width,FontWeight,RasterHeight,RasterizedChar};
+use smallvec::{smallvec, SmallVec};
 use spin::{Lazy, RwLock};
-use crate::printer::buffer::font_constants::{DEFAULT_DIM_FACTOR, DEFAULT_FONT_WEIGHT};
 
 /// Additional vertical space between lines
 const LINE_SPACING: usize = 2;
@@ -51,8 +45,8 @@ pub static WRITER: Lazy<RwLock<Writer>> = Lazy::new(|| RwLock::new(Writer {
     fg_color: DEFAULT_FOREGROUND,
     bg_color: DEFAULT_BACKGROUND,
     escape_state: EscapeState::None,
-    escape_params: Vec::with_capacity(8),
-    current_param: 0,
+    escape_params: smallvec![],
+    current_escape_param: 0,
     font_weight: DEFAULT_FONT_WEIGHT,
     dim_factor: DEFAULT_DIM_FACTOR
 }));
@@ -66,8 +60,8 @@ pub struct Writer {
     pub fg_color: Color,
     pub bg_color: Color,
     pub escape_state: EscapeState,
-    pub escape_params: Vec<u16>,
-    pub current_param: u16,
+    pub escape_params: SmallVec<[u16; 8]>,
+    pub current_escape_param: u16,
     pub font_weight: FontWeight,
     pub dim_factor: u16,
 }
@@ -162,7 +156,7 @@ impl Writer {
                 if byte == 0x5B {
                     self.escape_state = EscapeState::CSI;
                     self.escape_params.clear();
-                    self.current_param = 0;
+                    self.current_escape_param = 0;
                 } else {
                     self.escape_state = EscapeState::None;
                     self.write_char(char::from(byte));
@@ -171,11 +165,11 @@ impl Writer {
             EscapeState::CSI => {
                 match byte {
                     b'0'..=b'9' => {
-                        self.current_param = self.current_param * 10 + (byte - b'0') as u16;
+                        self.current_escape_param = self.current_escape_param * 10 + (byte - b'0') as u16;
                     },
                     b';' => {
-                        self.escape_params.push(self.current_param);
-                        self.current_param = 0;
+                        self.escape_params.push(self.current_escape_param);
+                        self.current_escape_param = 0;
                     },
                     // Terminal commands
                     b'K' => {
@@ -196,8 +190,8 @@ impl Writer {
                     },
                     b'm' => {
                         // Push the last parameter if it exists
-                        if self.current_param > 0 || self.escape_params.is_empty() {
-                            self.escape_params.push(self.current_param);
+                        if self.current_escape_param > 0 || self.escape_params.is_empty() {
+                            self.escape_params.push(self.current_escape_param);
                         }
 
                         self.process_sgr_params();
