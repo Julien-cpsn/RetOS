@@ -4,7 +4,7 @@ use bootloader_api::info::{FrameBufferInfo, PixelFormat};
 use core::cmp::max;
 use core::fmt;
 use font_constants::BACKUP_CHAR;
-use noto_sans_mono_bitmap::{get_raster,get_raster_width,FontWeight,RasterHeight,RasterizedChar};
+use noto_sans_mono_bitmap::{get_raster, get_raster_width, FontWeight, RasterHeight, RasterizedChar};
 use smallvec::{smallvec, SmallVec};
 use spin::{Lazy, RwLock};
 
@@ -184,7 +184,8 @@ impl Writer {
                         }
                         self.escape_state = EscapeState::None;
                     },
-                    b'D' => { // Backspace
+                    // Backspace
+                    b'D' => {
                         self.erase_char();
                         self.escape_state = EscapeState::None;
                     },
@@ -214,26 +215,47 @@ impl Writer {
             '\n' => self.newline(),
             '\r' => self.carriage_return(),
             '\t' => {
-                let next_x = self.x + font_constants::CHAR_RASTER_WIDTH * 4;
-                if next_x >= self.width() {
-                    self.newline();
-                }
-                let next_y = self.y + font_constants::CHAR_RASTER_HEIGHT.val() * 4 + BORDER_PADDING;
-                if next_y >= self.height() {
-                    self.clear();
-                }
                 for _ in 0..4 {
-                    self.write_rendered_char(self.get_char_raster(' '));
+                    self.write_char(' ');
                 }
             },
             c => {
+                let width = self.width();
+
                 let next_x = self.x + font_constants::CHAR_RASTER_WIDTH;
-                if next_x >= self.width() {
+                if next_x >= width {
                     self.newline();
                 }
-                let next_y = self.y + font_constants::CHAR_RASTER_HEIGHT.val() + BORDER_PADDING;
-                if next_y >= self.height() {
-                    self.clear();
+
+                let height = self.height();
+                let char_height = font_constants::CHAR_RASTER_HEIGHT.val();
+
+                let next_y = self.y + char_height + BORDER_PADDING;
+                if next_y >= height {
+                    let bytes_per_pixel = self.info.unwrap().bytes_per_pixel;
+                    let framebuffer = self.framebuffer.as_mut().unwrap();
+
+                    // Calculate row sizes and offsets
+                    let row_bytes = width * bytes_per_pixel;
+                    let pixels_to_move = height - char_height - BORDER_PADDING;
+
+                    // Instead of pixel-by-pixel, copy entire rows at once
+                    for x in 0..pixels_to_move {
+                        let src_offset = ((x + char_height + BORDER_PADDING) * width) * bytes_per_pixel;
+                        let dst_offset = (x * width) * bytes_per_pixel;
+
+                        // Copy the entire row at once
+                        framebuffer.copy_within(src_offset..src_offset + row_bytes, dst_offset);
+                    }
+
+                    // Clear the area at the bottom where new text will go
+                    // Instead of pixel-by-pixel, clear entire rows at once
+                    let clear_start = pixels_to_move * width * bytes_per_pixel;
+                    let clear_end = height * width * bytes_per_pixel;
+                    framebuffer[clear_start..clear_end].fill(0);
+
+                    // Reset cursor position
+                    self.y -= char_height;
                 }
                 self.write_rendered_char(self.get_char_raster(c));
             }
@@ -242,6 +264,7 @@ impl Writer {
 
     /// Prints a rendered char into the framebuffer.
     /// Updates `self.x`.
+    #[inline]
     fn write_rendered_char(&mut self, rendered_char: RasterizedChar) {
         for (y, row) in rendered_char.raster().iter().enumerate() {
             for (x, byte) in row.iter().enumerate() {
@@ -288,6 +311,7 @@ impl Writer {
     }
 
     /// Returns the raster of the given char or the raster of [`font_constants::BACKUP_CHAR`].
+    #[inline]
     fn get_char_raster(&self, c: char) -> RasterizedChar {
         get_raster(
             c,
@@ -331,7 +355,7 @@ impl Writer {
                 // Hidden
                 8 => {},
                 // Strike
-                9 => {}, 
+                9 => {},
                 // Fg color
                 30..=37 => self.fg_color = Color::from_ansi_aligned((self.escape_params[i] - 30) as u8, true),
                 // Bg color
@@ -353,7 +377,7 @@ impl Writer {
             i += 1;
         }
     }
-    
+
     fn reset_attributes(&mut self) {
         self.fg_color = DEFAULT_FOREGROUND;
         self.bg_color = DEFAULT_BACKGROUND;
