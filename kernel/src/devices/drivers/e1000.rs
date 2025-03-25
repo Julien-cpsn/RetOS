@@ -100,7 +100,7 @@ const INTERRUPT_RXO: u32 = 1 << 6;   // Receiver Overrun
 const INTERRUPT_RXT0: u32 = 1 << 7;  // Receiver Timer Interrupt
 
 // We'll use these interrupts for our driver
-const INTERRUPT_MASK: u32 = INTERRUPT_TXDW | INTERRUPT_TXQE | INTERRUPT_LSC | INTERRUPT_RXO | INTERRUPT_RXT0;
+const INTERRUPT_MASK: u32 = INTERRUPT_LSC | INTERRUPT_RXT0 | INTERRUPT_RXDMT0 | INTERRUPT_RXO | INTERRUPT_TXDW | INTERRUPT_TXQE;
 
 // Transmit Descriptor Bits
 const TX_DESC_CMD_EOP: u8 = 1 << 0;  // End of Packet
@@ -414,11 +414,18 @@ impl E1000 {
     }
 
     fn enable_interrupts(&self) {
-        // Clear any pending interrupts
-        let _ = self.read_register(REG_INTERRUPT_CAUSE);
+        // Clear any pending interrupts first
+        let icr = self.read_register(REG_INTERRUPT_CAUSE);
+        self.write_register(REG_INTERRUPT_CAUSE, icr);
 
-        // Enable interrupts
         self.write_register(REG_INTERRUPT_MASK, INTERRUPT_MASK);
+
+        // Make sure interrupts aren't disabled in the control register
+        /*
+        let ctrl = self.read_register(REG_CTRL);
+        if (ctrl & CTRL_SLU) == 0 {
+            self.write_register(REG_CTRL, ctrl | CTRL_SLU);
+        }*/
     }
 
     /// Function that handles interrupts from the E1000
@@ -446,6 +453,7 @@ impl E1000 {
             if (interrupt_cause & INTERRUPT_RXO) != 0 {
                 // Implement recovery logic for overruns
                 // Reset RX if needed
+                self.reset_rx_ring();
             }
 
             self.process_rx_packets();
@@ -483,20 +491,40 @@ impl E1000 {
             }
         }
 
-        // Re-enable interrupts if needed
-        self.enable_interrupts();
+        // Make sure we read the interrupt cause register again to check if any new
+        // interrupts have been generated during processing
+        /*
+        let new_interrupts = self.read_register(REG_INTERRUPT_CAUSE);
+        if new_interrupts != 0 {
+            // Clear any new interrupts that occurred during processing
+            self.write_register(REG_INTERRUPT_CAUSE, new_interrupts);
+        }*/
+    }
+
+    fn reset_rx_ring(&mut self) {
+        // Disable receive
+        self.write_register(REG_RCTL, 0);
+
+        // Reinitialize RX descriptors
+        self.setup_rx_descriptors();
+
+        // Re-enable receive
+        let rctl = RCTL_EN | RCTL_SBP | RCTL_BAM | RCTL_SECRC | RCTL_BSIZE_2048;
+        self.write_register(REG_RCTL, rctl);
     }
 
     fn process_rx_packets(&mut self) {
         // Process received packets
         let mut i = self.state.rx_cursor;
+        let mut processed_packets = 0;
+        let max_packets = RX_DESCRIPTORS;
 
         loop {
             // Check if descriptor is done
             let desc = &mut self.state.rx_descriptors[i];
 
-            if (desc.status & RX_DESC_STATUS_DD) == 0 {
-                // Not ready yet
+            if (desc.status & RX_DESC_STATUS_DD) == 0 || processed_packets >= max_packets {
+                // Not ready or processed too many packets
                 break;
             }
 
@@ -522,13 +550,15 @@ impl E1000 {
 
             // Reset the descriptor
             desc.status = 0;
+            // Indicate that the descriptor is available
+            self.write_register(REG_RDT, i as u32);
 
-            // Update tail pointer to indicate the descriptor is available
+            // Update tail pointer
             let new_tail = (i + 1) % RX_DESCRIPTORS;
-            self.write_register(REG_RDT, new_tail as u32);
 
             // Move to next descriptor
             i = new_tail;
+            processed_packets += 1;
         }
 
         // Update our position in the ring

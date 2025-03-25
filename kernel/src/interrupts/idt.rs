@@ -88,7 +88,7 @@ pub extern "x86-interrupt" fn network_packet_handler(_stack_frame: InterruptStac
         .unwrap()
         .lock()
         .end_interrupt(InterruptIndex::NetworkPacket.as_u8());
-    
+
     NETWORK_CONTROLLER
         .get()
         .unwrap()

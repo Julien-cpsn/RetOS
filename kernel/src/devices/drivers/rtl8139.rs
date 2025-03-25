@@ -284,7 +284,7 @@ impl Rtl8139State {
         // always point to the start of the header.
         // To calculate the new cursor we add the length of the previous frame which SHOULD include
         // the 4 bytes for the header, we also add 3 for 32 bit alignment and then mask the result.
-        self.rx_cursor = (self.rx_cursor + length as usize + 4 + 3) & !3;
+        self.rx_cursor = (self.rx_cursor + length + 4 + 3) & !3;
 
         if self.rx_cursor > RX_BUF_LEN {
             self.rx_cursor -= RX_BUF_LEN

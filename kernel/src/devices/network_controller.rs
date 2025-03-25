@@ -15,7 +15,6 @@ use strum::Display;
 use x86_64::instructions::interrupts;
 use crate::interrupts::idt::{network_packet_handler, register_interrupt};
 use crate::interrupts::interrupt::InterruptIndex;
-use crate::println;
 
 const GOOLOG_TARGET: &str = "NETWORK";
 
@@ -65,7 +64,6 @@ impl NetworkController {
     }
     
     pub fn end_interrupt(&mut self) {
-        println!("0");
         match self {
             NetworkController::RTL8139(rlt8139) => rlt8139.on_interrupt(),
             NetworkController::E1000(e1000) => e1000.on_interrupt(),
