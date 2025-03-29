@@ -3,4 +3,4 @@ pub mod terminal;
 pub mod commands;
 mod error;
 mod macros;
-mod verbosity;
+mod arguments;

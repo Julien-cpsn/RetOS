@@ -33,35 +33,78 @@ macro_rules! arg_from_enum {
 macro_rules! add_verbosity {
     (
         $(#[$enum_meta:meta])*
-         $vis:vis enum $name:ident<'a> {
+         $vis:vis enum $name:ident$(<$lifetime:lifetime>)? {
             $(
-                $(#[$meta:meta])* // Capture des attributs des variants (comme /// commentaires)
+                $(#[$meta:meta])*
                 $variant:ident $( {
-                    $(#[$field_meta:meta])*
-                    $($field:ident : $type:ty),* $(,)?
+                    $(
+                        $(#[$field_meta:meta])*
+                        $field:ident : $field_type:ty
+                    ),* $(,)?
                 } )?
             ),* $(,)?
         }
     ) => {
-        use crate::terminal::verbosity::Verbosity;
+        use $crate::terminal::arguments::verbosity::Verbosity;
 
         $(#[$enum_meta])*
-        $vis enum $name<'a> {
+        $vis enum $name$(<$lifetime>)? {
             $(
                 $(#[$meta])*
                 $variant {
                     #[arg(short = "v", value_name = "level", default_value_t = None)]
                     /// Change verbosity
                     verbosity: Option<Verbosity>,
-                    $($($field : $type),*)?
+                    $(
+                        $(
+                            $(#[$field_meta])*
+                            $field : $field_type
+                        ),*
+                    )?
                 },
             )*
         }
 
-        impl<'a> $name<'a> {
+        impl$(<$lifetime>)? $name$(<$lifetime>)? {
+            /// Fixme: recursive verbosity
             pub fn get_verbosity(&self) -> &Option<Verbosity> {
                 match self {
                     $(Self::$variant { verbosity, .. } => verbosity),*
+                }
+            }
+        }
+    };
+}
+
+#[macro_export]
+/// Add a verbosity argument to every enum subcommand
+macro_rules! add_group_verbosity {
+    (
+        $(#[$enum_meta:meta])*
+         $vis:vis enum $name:ident$(<$lifetime:lifetime>)? {
+            $(
+                $(#[$meta:meta])*
+                $variant:ident($field_type:ty)
+            ),* $(,)?
+        }
+    ) => {
+        use $crate::terminal::arguments::verbosity::Verbosity;
+
+        $(#[$enum_meta])*
+        $vis enum $name$(<$lifetime>)? {
+            $(
+                $(#[$meta])*
+                $variant(Option<$field_type>),
+            )*
+        }
+
+        impl$(<$lifetime>)? $name$(<$lifetime>)? {
+            pub fn get_verbosity(&self) -> &Option<Verbosity> {
+                match self {
+                    $(Self::$variant(subcommand) => match subcommand {
+                        None => &None,
+                        Some(variant) => variant.get_verbosity(),
+                    }),*
                 }
             }
         }

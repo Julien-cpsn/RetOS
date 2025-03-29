@@ -23,6 +23,9 @@ acpi = "5.2.0"
 pci_types = "0.10.0"
 xhci = "0.9.2"
 
+# Network
+smoltcp = { version = "0.12.0", default-features = false, features = ["alloc", "medium-ethernet", "medium-ip", "socket-raw", "socket-udp", "socket-tcp", "socket-icmp", "socket-dhcpv4", "socket-dns", "proto-ipv4", "proto-ipv6", "proto-ipv4-fragmentation", "proto-ipv6-fragmentation", "packetmeta-id", "multicast", "proto-ipsec", "verbose", "log"]}
+
 # Cli
 embedded-cli = "0.2.1"
 
@@ -41,3 +44,5 @@ noto-sans-mono-bitmap = { version = "0.3.1", default-features = false, features 
 yansi = { version = "1.0.1", default-features = false, features = ["alloc"]}
 text-tables = { version = "0.4.0", git = "https://github.com/Julien-cpsn/text-table-rs" }
 qemu-exit = "3.0.2"
+byteorder = { version = "1.5.0", default-features = false}
+retos-macros = { path = "../retos-macros" }

@@ -1,11 +1,15 @@
+use alloc::string::String;
 use embedded_cli::__private::io::{ErrorKind, ErrorType};
 use thiserror::Error;
 use crate::terminal::terminal::TerminalBuffer;
 
 #[derive(Error, Debug)]
 pub enum CliError {
-    #[error("Error code: {0}")]
+    #[error("error code {0}")]
     Code(u64),
+    
+    #[error("{0}")]
+    Message(String),
 }
 
 impl embedded_cli::__private::io::Error for CliError {

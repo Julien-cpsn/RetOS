@@ -9,7 +9,6 @@ use bootloader_api::{BootInfo, BootloaderConfig};
 use core::panic::PanicInfo;
 use goolog::init_logger;
 use goolog::log::{set_max_level, Level, LevelFilter};
-use retos_kernel::clock::MilliSecondClock;
 use retos_kernel::logger::print_log;
 use retos_kernel::memory::tables::{MAPPER, MEMORY_REGIONS};
 use retos_kernel::task::executor::{run_tasks, spawn_task};
@@ -79,10 +78,7 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
     init_logger(
         Some(Level::Trace),
         None,
-        &|_timestamp, target, level, args| {
-            let timestamp = MilliSecondClock::format();
-            print_log(&timestamp, target, level, args);
-        },
+        &|_timestamp, target, level, args| print_log(target, level, args)
     )
         .expect("Could not initialize logger");
 

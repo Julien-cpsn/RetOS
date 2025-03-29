@@ -92,7 +92,6 @@ pub extern "x86-interrupt" fn network_packet_handler(_stack_frame: InterruptStac
     NETWORK_CONTROLLER
         .get()
         .unwrap()
-        .lock()
         .end_interrupt();
 }
 

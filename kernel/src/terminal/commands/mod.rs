@@ -7,3 +7,6 @@ pub mod uptime;
 pub mod lspci;
 pub mod scanpci;
 pub mod top;
+pub mod ip;
+pub mod ping;
+pub mod sleep;

@@ -1,26 +1,31 @@
+use core::str::FromStr;
 use embedded_cli::arguments::FromArgumentError;
-use goolog::log::LevelFilter;
+use smoltcp::wire::{IpAddress, IpCidr};
 
-pub struct Verbosity {
-    pub level: LevelFilter
+pub struct IpAddressArg(pub IpAddress);
+
+impl<'a> embedded_cli::arguments::FromArgument<'a> for IpAddressArg {
+    fn from_arg(arg: &'a str) -> Result<Self, FromArgumentError<'a>> where Self: Sized {
+        match IpAddress::from_str(arg) {
+            Ok(ip_address) => Ok(IpAddressArg(ip_address)),
+            Err(_) => Err(FromArgumentError {
+                value: arg,
+                expected: "IPv4 or IPv6 address",
+            })
+        }
+    }
 }
 
-impl<'a> embedded_cli::arguments::FromArgument<'a> for Verbosity {
-    fn from_arg(arg: &'a str) -> Result<Self, FromArgumentError<'a>> where Self: Sized {
-        let level = match arg {
-            "" => LevelFilter::Warn,
-            "v" => LevelFilter::Info,
-            "vv" => LevelFilter::Debug,
-            "vvv" => LevelFilter::Trace,
-            "q" => LevelFilter::Off,
-            _ => return Err(FromArgumentError {
-                value: arg,
-                expected: "v|vv|vvv|vvvv|q",
-            })
-        };
+pub struct IpCidrArg(pub IpCidr);
 
-        Ok(Self {
-            level,
-        })
+impl<'a> embedded_cli::arguments::FromArgument<'a> for IpCidrArg {
+    fn from_arg(arg: &'a str) -> Result<Self, FromArgumentError<'a>> where Self: Sized {
+        match IpCidr::from_str(arg) {
+            Ok(ip_address) => Ok(IpCidrArg(ip_address)),
+            Err(_) => Err(FromArgumentError {
+                value: arg,
+                expected: "IPv4 or IPv6 address with subnet mask (Cidr)",
+            })
+        }
     }
 }
