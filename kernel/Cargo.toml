@@ -9,7 +9,7 @@ bootloader_api = "0.11.10"
 x86_64 = "0.15.2"
 
 # Alloc
-spin = { version = "0.9.8", features = ["lazy"] }
+spin = { version = "0.10.0", features = ["lazy"] }
 talc = { version = "4.4.2", features = ["counters"] }
 
 # Async
@@ -17,6 +17,7 @@ crossbeam-queue = { version = "0.3.12", default-features = false, features = ["a
 futures-util = { version = "0.3.31", default-features = false, features = ["alloc", "async-await", "sink"] }
 
 # Devices
+uart_16550 = { version = "0.3.2", features = ["nightly"] }
 pc-keyboard = "0.8.0"
 pic8259 = "0.11.0"
 acpi = "5.2.0"

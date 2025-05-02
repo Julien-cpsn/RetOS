@@ -1,4 +1,3 @@
-use crate::interrupts::idt::KEYBOARD;
 use crate::println;
 use crate::terminal::cli::handle_command;
 use crate::terminal::terminal::TerminalBuffer;
@@ -12,7 +11,7 @@ use goolog::set_target;
 use pc_keyboard::{DecodedKey, KeyCode};
 use spin::Once;
 
-static SCANCODE_QUEUE: Once<ArrayQueue<u8>> = Once::new();
+static SCANCODE_QUEUE: Once<ArrayQueue<DecodedKey>> = Once::new();
 static WAKER: AtomicWaker = AtomicWaker::new();
 
 pub struct ScancodeStream {
@@ -34,9 +33,9 @@ impl ScancodeStream {
 }
 
 impl Stream for ScancodeStream {
-    type Item = u8;
+    type Item = DecodedKey;
 
-    fn poll_next(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Option<u8>> {
+    fn poll_next(self: Pin<&mut Self>, cx: &mut Context) -> Poll<Option<DecodedKey>> {
         let queue = SCANCODE_QUEUE
             .get()
             .expect("scancode queue not initialized");
@@ -57,9 +56,9 @@ impl Stream for ScancodeStream {
     }
 }
 
-pub fn add_scancode(scancode: u8) {
+pub fn add_key(key: DecodedKey) {
     if let Some(queue) = SCANCODE_QUEUE.get() {
-        match queue.push(scancode) {
+        match queue.push(key) {
             Ok(_) => WAKER.wake(),
             Err(_) => println!("WARNING: scancode queue full; dropping keyboard input")
         }
@@ -88,37 +87,40 @@ pub async fn handle_keyboard() {
         .ok()
         .unwrap();
 
-    while let Some(scancode) = scancodes.next().await {
-        let mut keyboard = KEYBOARD.write();
-        if let Ok(Some(key_event)) = keyboard.add_byte(scancode) {
-            if let Some(key) = keyboard.process_keyevent(key_event) {
-                drop(keyboard);
-                match key {
-                    DecodedKey::Unicode(character) => handle_command(&mut cli, character as u8),
-                    DecodedKey::RawKey(key) => match key {
-                        KeyCode::ArrowUp => {
-                            handle_command(&mut cli, 0x1B);
-                            handle_command(&mut cli, b'[');
-                            handle_command(&mut cli, b'A');
-                        },
-                        KeyCode::ArrowDown => {
-                            handle_command(&mut cli, 0x1B);
-                            handle_command(&mut cli, b'[');
-                            handle_command(&mut cli, b'B');
-                        },
-                        KeyCode::ArrowRight => {
-                            handle_command(&mut cli, 0x1B);
-                            handle_command(&mut cli, b'[');
-                            handle_command(&mut cli, b'C');
-                        },
-                        KeyCode::ArrowLeft => {
-                            handle_command(&mut cli, 0x1B);
-                            handle_command(&mut cli, b'[');
-                            handle_command(&mut cli, b'D');
-                        },
-                        _ => {}
-                    }
-                }
+    while let Some(key) = scancodes.next().await {
+        match key {
+            DecodedKey::Unicode(character) => handle_command(&mut cli, character as u8),
+            DecodedKey::RawKey(key) => match key {
+                KeyCode::ArrowUp => {
+                    handle_command(&mut cli, 0x1B);
+                    handle_command(&mut cli, b'[');
+                    handle_command(&mut cli, b'1');
+                    handle_command(&mut cli, b'A');
+                },
+                KeyCode::ArrowDown => {
+                    handle_command(&mut cli, 0x1B);
+                    handle_command(&mut cli, b'[');
+                    handle_command(&mut cli, b'1');
+                    handle_command(&mut cli, b'B');
+                },
+                KeyCode::ArrowRight => {
+                    handle_command(&mut cli, 0x1B);
+                    handle_command(&mut cli, b'[');
+                    handle_command(&mut cli, b'1');
+                    handle_command(&mut cli, b'C');
+                },
+                KeyCode::ArrowLeft => {
+                    handle_command(&mut cli, 0x1B);
+                    handle_command(&mut cli, b'[');
+                    handle_command(&mut cli, b'1');
+                    handle_command(&mut cli, b'D');
+                },
+                KeyCode::Backspace => {
+                    handle_command(&mut cli, 0x1B);
+                    handle_command(&mut cli, b'[');
+                    handle_command(&mut cli, b'D');
+                },
+                _ => {}
             }
         }
     }

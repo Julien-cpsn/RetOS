@@ -13,6 +13,7 @@ impl embedded_cli::__private::io::Write for TerminalBuffer {
     }
 }
 
+#[inline]
 pub fn write_to_writer(buf: &[u8]) {
     let mut writer = WRITER.write();
     // Debugger

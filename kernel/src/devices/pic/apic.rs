@@ -104,7 +104,7 @@ impl Apic {
         PIC.call_once(|| Mutex::new(PicType::APIC(Apic::default())));
         Apic::init_io_apic(apic.io_apics[0].address as u64);
         Apic::init_local_apic(apic.local_apic_address);
-        Apic::disable_pic();
+        Apic::disable_legacy_pic();
     }
     
     fn init_local_apic(local_apic_addr: u64) {
@@ -128,12 +128,13 @@ impl Apic {
         apic.io = virt_addr.as_mut_ptr::<u32>();
 
         apic.register_interrupt(0x12, InterruptIndex::Keyboard);
+        apic.register_interrupt(0x18, InterruptIndex::Serial1);
     }
 
     pub fn register_interrupt(&self, offset: u32, index: InterruptIndex) {
         unsafe {
             self.io.offset(0).write_volatile(offset);
-            self.io.offset(4).write_volatile(index.as_u8() as u32);
+            self.io.offset(4).write_volatile(index as u32);
         }
     }
 
@@ -176,7 +177,7 @@ impl Apic {
     }
 
     /// Disable any unneeded PIC features, such as timer or keyboard to prevent it from firing interrupts
-    fn disable_pic() {
+    fn disable_legacy_pic() {
         unsafe {
             // PIC2 (Slave PIC)
             Port::<u8>::new(0x21).write(0xFF);

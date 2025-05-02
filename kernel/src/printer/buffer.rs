@@ -1,3 +1,4 @@
+use crate::devices::serial::SERIAL1;
 use crate::printer::buffer::font_constants::{DEFAULT_DIM_FACTOR, DEFAULT_FONT_WEIGHT};
 use crate::printer::color::{Color, DEFAULT_BACKGROUND, DEFAULT_FOREGROUND};
 use bootloader_api::info::{FrameBufferInfo, PixelFormat};
@@ -142,6 +143,8 @@ impl Writer {
     }
 
     pub fn write_byte(&mut self, byte: u8) {
+        SERIAL1.write().send_raw(byte);
+
         match self.escape_state {
             EscapeState::None => {
                 // ESC
