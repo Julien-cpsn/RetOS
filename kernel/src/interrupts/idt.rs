@@ -1,11 +1,12 @@
 use crate::clock::tick_handler;
-use crate::devices::pic::pic::PIC;
 use crate::devices::network_controller::NETWORK_CONTROLLER;
+use crate::devices::pic::pic::PIC;
+use crate::devices::serial::SERIAL1;
 use crate::interrupts::gdt;
 use crate::interrupts::interrupt::InterruptIndex;
 use crate::{hlt_loop, println, task};
 use pc_keyboard::layouts::{AnyLayout, Us104Key};
-use pc_keyboard::{HandleControl, Keyboard, ScancodeSet1};
+use pc_keyboard::{DecodedKey, HandleControl, KeyCode, Keyboard, ScancodeSet1};
 use spin::{Lazy, Mutex, RwLock};
 use x86_64::instructions::port::Port;
 use x86_64::registers::control::Cr2;
@@ -28,6 +29,7 @@ pub static IDT: Lazy<Mutex<InterruptDescriptorTable>> = Lazy::new(|| {
     
     idt[InterruptIndex::Timer.as_u8()].set_handler_fn(timer_interrupt_handler);
     idt[InterruptIndex::Keyboard.as_u8()].set_handler_fn(keyboard_interrupt_handler);
+    idt[InterruptIndex::Serial1.as_u8()].set_handler_fn(serial_interrupt_handler);
 
     Mutex::new(idt)
 });
@@ -73,13 +75,45 @@ extern "x86-interrupt" fn keyboard_interrupt_handler(_stack_frame: InterruptStac
     let mut port = Port::new(0x60);
 
     let scancode: u8 = unsafe { port.read() };
-    task::keyboard::add_scancode(scancode);
+
+    {
+        let mut keyboard = KEYBOARD.write();
+        if let Ok(Some(key_event)) = keyboard.add_byte(scancode) {
+            if let Some(key) = keyboard.process_keyevent(key_event) {
+                task::keyboard::add_key(key);
+            }
+        }
+    }
 
     PIC
         .get()
         .unwrap()
         .lock()
         .end_interrupt(InterruptIndex::Keyboard.as_u8());
+}
+
+
+extern "x86-interrupt" fn serial_interrupt_handler(_stack_frame: InterruptStackFrame) {
+    {
+        let scancode = SERIAL1.write().receive();
+        let key = match scancode {
+            0x20 => DecodedKey::Unicode(' '),
+            0x09 => DecodedKey::Unicode('\t'),
+            0x0D => DecodedKey::Unicode('\n'),
+            0x0A => DecodedKey::Unicode('\n'),
+            0x08 => DecodedKey::RawKey(KeyCode::Backspace),
+            0x21..=0x7E => DecodedKey::Unicode(scancode as char),
+            _ => return
+        };
+
+        task::keyboard::add_key(key);
+    }
+
+    PIC
+        .get()
+        .unwrap()
+        .lock()
+        .end_interrupt(InterruptIndex::Serial1.as_u8());
 }
 
 pub extern "x86-interrupt" fn network_packet_handler(_stack_frame: InterruptStackFrame) {

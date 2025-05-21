@@ -1,12 +1,12 @@
-use acpi::{AcpiTables, InterruptModel};
-use pic8259::ChainedPics;
-use spin::{Mutex, Once};
-use x86_64::VirtAddr;
 use crate::devices::acpi::AcpiHandlerImpl;
 use crate::devices::pic::apic::Apic;
 use crate::devices::pic::legacy::init_legacy_pics;
 use crate::interrupts::interrupt::InterruptIndex;
 use crate::print;
+use acpi::{AcpiTables, InterruptModel};
+use pic8259::ChainedPics;
+use spin::{Mutex, Once};
+use x86_64::VirtAddr;
 
 pub static PIC: Once<Mutex<PicType>> = Once::new();
 
