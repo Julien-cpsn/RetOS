@@ -1,8 +1,6 @@
 use crate::clock::{sleep, Clock};
 use crate::terminal::error::CliError;
 use crate::{println};
-use crate::devices::network::device::NetworkDevice;
-use crate::devices::network::interface::NETWORK_INTERFACES;
 use alloc::collections::BTreeMap;
 use alloc::vec;
 use core::cmp;
@@ -13,6 +11,7 @@ use smoltcp::phy::Device;
 use smoltcp::socket::icmp::{Endpoint, PacketBuffer, PacketMetadata, Socket};
 use smoltcp::time::{Duration, Instant};
 use smoltcp::wire::{Icmpv4Packet, Icmpv4Repr, Icmpv6Packet, Icmpv6Repr, IpAddress};
+use crate::devices::network::manager::NETWORK_MANAGER;
 
 const GOOLOG_TARGET: &str = "PING";
 
@@ -53,11 +52,12 @@ macro_rules! get_icmp_pong {
 pub fn ping(remote_addr: IpAddress) -> Result<(), CliError> {
     trace!("PING");
 
-    let mut network_interfaces = NETWORK_INTERFACES.write();
-    let mut device = NetworkDevice;
-    let iface_name = "eth";
-    let iface = network_interfaces.get_mut(iface_name).unwrap();
-    let device_caps = device.capabilities();
+    let mut network_manager = NETWORK_MANAGER.lock();
+    let iface_name = "eth0";
+    let network_device = network_manager.interfaces.get_mut(iface_name).unwrap();
+    let iface = &mut network_device.interface;
+    let device_caps = network_device.network_controller.capabilities();
+    let smoltcp_device = &mut network_device.network_controller;
 
     let icmp_rx_buffer = PacketBuffer::new(vec![PacketMetadata::EMPTY], vec![0; 256]);
     let icmp_tx_buffer = PacketBuffer::new(vec![PacketMetadata::EMPTY], vec![0; 256]);
@@ -78,7 +78,7 @@ pub fn ping(remote_addr: IpAddress) -> Result<(), CliError> {
 
     loop {
         let timestamp = Clock::now();
-        iface.poll(timestamp, &mut device, &mut sockets);
+        iface.poll(timestamp, smoltcp_device, &mut sockets);
 
         let timestamp = Clock::now();
         let socket = sockets.get_mut::<Socket>(icmp_handle);

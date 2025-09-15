@@ -8,10 +8,10 @@ default-run = "qemu_uefi"
 members = ["kernel", "retos-macros"]
 
 [dependencies]
-ovmf-prebuilt = "0.2.2"
+ovmf-prebuilt = "0.2.3"
 
 [build-dependencies]
-bootloader = "0.11.10"
+bootloader = "0.11.12"
 retos-kernel = { path = "kernel", artifact = "bin", target = "x86_64-unknown-none", version = "0.1.0" }
 retos-macros = { path = "retos-macros"}
 

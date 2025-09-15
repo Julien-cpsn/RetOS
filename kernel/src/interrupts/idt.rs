@@ -1,5 +1,5 @@
 use crate::clock::tick_handler;
-use crate::devices::network_controller::NETWORK_CONTROLLER;
+use crate::devices::network::manager::{NETWORK_DEVICES_INTERRUPT_IRQ, NETWORK_MANAGER};
 use crate::devices::pic::pic::PIC;
 use crate::devices::serial::SERIAL1;
 use crate::interrupts::gdt;
@@ -31,6 +31,11 @@ pub static IDT: Lazy<Mutex<InterruptDescriptorTable>> = Lazy::new(|| {
     idt[InterruptIndex::Keyboard.as_u8()].set_handler_fn(keyboard_interrupt_handler);
     idt[InterruptIndex::Serial1.as_u8()].set_handler_fn(serial_interrupt_handler);
 
+    idt[NETWORK_DEVICES_INTERRUPT_IRQ].set_handler_fn(network_packet_handler_0);
+    idt[NETWORK_DEVICES_INTERRUPT_IRQ + 1].set_handler_fn(network_packet_handler_1);
+    idt[NETWORK_DEVICES_INTERRUPT_IRQ + 2].set_handler_fn(network_packet_handler_2);
+    idt[NETWORK_DEVICES_INTERRUPT_IRQ + 3].set_handler_fn(network_packet_handler_3);
+
     Mutex::new(idt)
 });
 
@@ -41,9 +46,10 @@ pub fn init_idt() {
     unsafe { idt.load_unsafe() };
 }
 
-pub fn register_interrupt(offset: u32, interrupt: InterruptIndex, handler: extern "x86-interrupt" fn(InterruptStackFrame)) {
+/*
+pub fn register_interrupt(offset: u8, interrupt: u8, handler: extern "x86-interrupt" fn(InterruptStackFrame)) {
     let mut idt = IDT.lock();
-    idt[interrupt.as_u8()].set_handler_fn(handler);
+    idt[interrupt].set_handler_fn(handler);
     unsafe { idt.load_unsafe() };
 
     PIC
@@ -51,7 +57,7 @@ pub fn register_interrupt(offset: u32, interrupt: InterruptIndex, handler: exter
         .unwrap()
         .lock()
         .register_interrupt(offset, interrupt)
-}
+}*/
 
 extern "x86-interrupt" fn breakpoint_handler(stack_frame: InterruptStackFrame) {
     println!("EXCEPTION: BREAKPOINT\n{:#?}", stack_frame);
@@ -68,7 +74,7 @@ extern "x86-interrupt" fn timer_interrupt_handler(_stack_frame: InterruptStackFr
         .get()
         .unwrap()
         .lock()
-        .end_interrupt(InterruptIndex::Timer.as_u8());
+        .end_interrupt();
 }
 
 extern "x86-interrupt" fn keyboard_interrupt_handler(_stack_frame: InterruptStackFrame) {
@@ -89,7 +95,7 @@ extern "x86-interrupt" fn keyboard_interrupt_handler(_stack_frame: InterruptStac
         .get()
         .unwrap()
         .lock()
-        .end_interrupt(InterruptIndex::Keyboard.as_u8());
+        .end_interrupt();
 }
 
 
@@ -113,20 +119,41 @@ extern "x86-interrupt" fn serial_interrupt_handler(_stack_frame: InterruptStackF
         .get()
         .unwrap()
         .lock()
-        .end_interrupt(InterruptIndex::Serial1.as_u8());
+        .end_interrupt();
 }
 
-pub extern "x86-interrupt" fn network_packet_handler(_stack_frame: InterruptStackFrame) {
-    PIC
-        .get()
-        .unwrap()
-        .lock()
-        .end_interrupt(InterruptIndex::NetworkPacket.as_u8());
+pub extern "x86-interrupt" fn network_packet_handler_0(_stack_frame: InterruptStackFrame) {
+    network_packet_handler(0xB);
+}
 
-    NETWORK_CONTROLLER
+pub extern "x86-interrupt" fn network_packet_handler_1(_stack_frame: InterruptStackFrame) {
+    network_packet_handler(0xB + 1);
+}
+
+pub extern "x86-interrupt" fn network_packet_handler_2(_stack_frame: InterruptStackFrame) {
+    network_packet_handler(0xB + 2);
+}
+
+pub extern "x86-interrupt" fn network_packet_handler_3(_stack_frame: InterruptStackFrame) {
+    network_packet_handler(0xB + 3);
+}
+
+
+fn network_packet_handler(interrupt_line: u8) {
+    println!("Received packet");
+
+    let mut pic = PIC
         .get()
         .unwrap()
-        .end_interrupt();
+        .lock();
+
+    //println!("0x{:X}", interrupt_line);
+
+    if let Some(mut network_manager) = NETWORK_MANAGER.try_lock() {
+        network_manager.handle_interrupt(interrupt_line)
+    }
+
+    pic.end_interrupt();
 }
 
 extern "x86-interrupt" fn page_fault_handler(stack_frame: InterruptStackFrame, error_code: PageFaultErrorCode) {

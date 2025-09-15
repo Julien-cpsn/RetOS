@@ -1,7 +1,6 @@
 use crate::devices::acpi::AcpiHandlerImpl;
 use crate::devices::pic::apic::Apic;
 use crate::devices::pic::legacy::init_legacy_pics;
-use crate::interrupts::interrupt::InterruptIndex;
 use crate::print;
 use acpi::{AcpiTables, InterruptModel};
 use pic8259::ChainedPics;
@@ -33,19 +32,27 @@ impl PicType {
         }
     }
 
-    pub fn register_interrupt(&self, offset: u32, index: InterruptIndex) {
+    pub fn register_interrupt(&self, irq: u8, vector: u8) {
         match self {
-            PicType::APIC(apic) => apic.register_interrupt(offset, index),
+            PicType::APIC(apic) => {
+                let id = apic.local_apic_id();
+                apic.register_ioapic_interrupt(irq, vector, id)
+            },
             PicType::PICS(_) => todo!()
         }
     }
     
-    pub fn end_interrupt(&mut self, interrupt_id: u8) {
-        unsafe {
-            match self {
-                PicType::APIC(apic) => apic.end_interrupt(),
-                PicType::PICS(pics) => pics.notify_end_of_interrupt(interrupt_id)
-            }
+    pub fn end_interrupt(&mut self) {
+        match self {
+            PicType::APIC(apic) => apic.end_interrupt(),
+            PicType::PICS(_pics) => todo!()
+        }
+    }
+
+    pub fn get_interrupt_vector(&self) -> Option<u8> {
+        match self {
+            PicType::APIC(apic) => apic.get_interrupt_vector(),
+            PicType::PICS(_) => todo!()
         }
     }
 }

@@ -1,5 +1,4 @@
 use crate::add_verbosity;
-use crate::devices::network::interface::NETWORK_INTERFACES;
 use crate::terminal::arguments::ip_address::{IpCidrArg};
 use crate::terminal::arguments::network_interface::NetworkInterfaceArg;
 use crate::terminal::error::CliError;
@@ -7,6 +6,7 @@ use alloc::format;
 use embedded_cli::Command;
 use goolog::{debug, info, trace};
 use smoltcp::wire::{IpCidr};
+use crate::devices::network::manager::NETWORK_MANAGER;
 
 const GOOLOG_TARGET: &str = "IP ADDRESS";
 
@@ -37,10 +37,11 @@ pub fn ip_address_add(ip_address: IpCidr, interface_name: &str) -> Result<(), Cl
     trace!("IP ADDRESS ADD");
 
     trace!("Locking NETWORK_INTERFACES mutex...");
-    let mut network_interfaces = NETWORK_INTERFACES.write();
+    let mut network_manager = NETWORK_MANAGER.lock();
 
     trace!("Retrieving network interface \"{}\"", interface_name);
-    let iface = network_interfaces.get_mut(interface_name).unwrap();
+    let device = network_manager.interfaces.get_mut(interface_name).unwrap();
+    let iface = &mut device.interface;
 
     info!("Adding IP address");
     iface.update_ip_addrs(|addrs| {
@@ -56,10 +57,12 @@ pub fn ip_address_delete(ip_address: IpCidr, interface_name: &str) -> Result<(),
     trace!("IP ADDRESS DELETE");
 
     trace!("Locking NETWORK_INTERFACES mutex...");
-    let mut network_interfaces = NETWORK_INTERFACES.write();
+
+    let mut network_manager = NETWORK_MANAGER.lock();
 
     trace!("Retrieving network interface \"{}\"", interface_name);
-    let iface = network_interfaces.get_mut(interface_name).unwrap();
+    let device = network_manager.interfaces.get_mut(interface_name).unwrap();
+    let iface = &mut device.interface;
 
     debug!("Finding IP address");
     let mut was_address_found = false;

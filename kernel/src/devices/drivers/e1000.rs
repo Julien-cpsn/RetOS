@@ -1,17 +1,18 @@
 use crate::devices::mmio::MemoryMapper;
-use crate::devices::network_controller::{register_network_controller, NetworkController};
-use crate::devices::network::device::RECEIVED_FRAMES;
 use crate::devices::pci::{PciDevice, PCI_ACCESS};
 use crate::memory::tables::translate_addr;
 use alloc::boxed::Box;
 use alloc::{vec};
+use alloc::sync::Arc;
 use alloc::vec::Vec;
 use accessor::Mapper;
+use crossbeam_queue::SegQueue;
 use goolog::{debug};
 use pci_types::{CommandRegister, EndpointHeader, PciHeader};
 use spin::Mutex;
 use x86_64::instructions::interrupts;
 use x86_64::VirtAddr;
+use crate::devices::network::manager::NETWORK_MANAGER;
 
 const GOOLOG_TARGET: &str = "E1000";
 
@@ -146,11 +147,12 @@ pub struct RxDescriptor {
 #[derive(Debug)]
 pub struct E1000 {
     pub mac: [u8; 6],
-    pub state: E1000State,
+    state: E1000State,
+    frames: SegQueue<Vec<u8>>
 }
 
 #[derive(Debug)]
-pub struct E1000State {
+struct E1000State {
     pub mmio_base: u64,
     pub rx: Mutex<E1000Rx>,
     pub tx: Mutex<E1000Tx>,
@@ -189,7 +191,9 @@ pub fn init_e1000(pci_device: &PciDevice) {
     let mut e1000 = E1000::new(virt_mmio_base as u64);
     e1000.init();
 
-    register_network_controller(NetworkController::E1000(Box::from(e1000)), line as u32)
+    NETWORK_MANAGER
+        .lock()
+        .register_device(line, Arc::new(Mutex::new(e1000)));
 }
 
 impl E1000 {
@@ -236,6 +240,7 @@ impl E1000 {
         Self {
             mac: [0; 6],
             state,
+            frames: SegQueue::new(),
         }
     }
 
@@ -357,7 +362,7 @@ impl E1000 {
         self.write_register(REG_RDBAH, (phys_addr >> 32) as u32);
 
         // Set the descriptor ring length (in bytes)
-        self.write_register(REG_RDLEN, (RX_DESCRIPTORS * core::mem::size_of::<RxDescriptor>()) as u32);
+        self.write_register(REG_RDLEN, (RX_DESCRIPTORS * size_of::<RxDescriptor>()) as u32);
 
         // Initialize head and tail pointers
         self.write_register(REG_RDH, 0);
@@ -424,9 +429,19 @@ impl E1000 {
     fn enable_interrupts(&self) {
         // Clear any pending interrupts first
         let icr = self.read_register(REG_INTERRUPT_CAUSE);
-        self.write_register(REG_INTERRUPT_CAUSE, icr);
+        if icr != 0 {
+            self.write_register(REG_INTERRUPT_CAUSE, icr);
+        }
 
-        self.write_register(REG_INTERRUPT_MASK, INTERRUPT_MASK);
+        // Enable interrupts (set mask bits)
+        let old_mask = self.read_register(REG_INTERRUPT_MASK);
+        self.write_register(REG_INTERRUPT_MASK, old_mask | INTERRUPT_MASK);
+    }
+
+    pub fn pending_interrupt(&self) -> bool {
+        let interrupt_cause = self.read_register(REG_INTERRUPT_CAUSE);
+
+        interrupt_cause != 0
     }
 
     /// Function that handles interrupts from the E1000
@@ -542,7 +557,7 @@ impl E1000 {
             if length > 0 {
                 // Copy the packet to a new buffer
                 let packet = rx.rx_buffers[i][0..length].to_vec();
-                RECEIVED_FRAMES.push(packet);
+                self.frames.push(packet);
             }
 
             // Update tail pointer
@@ -586,5 +601,9 @@ impl E1000 {
             // Update our position in the ring
             tx.tx_cursor = new_cursor;
         });
+    }
+
+    pub fn recv_sync(&mut self) -> Option<Vec<u8>> {
+        self.frames.pop()
     }
 }

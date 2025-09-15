@@ -1,5 +1,4 @@
 use crate::{add_verbosity};
-use crate::devices::network::interface::NETWORK_INTERFACES;
 use crate::printer::buffer::WRITER;
 use crate::terminal::arguments::ip_address::{IpAddressArg, IpCidrArg};
 use crate::terminal::arguments::network_interface::NetworkInterfaceArg;
@@ -10,6 +9,7 @@ use embedded_cli::Command;
 use goolog::{debug, info, trace};
 use smoltcp::iface::Route;
 use smoltcp::wire::{IpAddress, IpCidr};
+use crate::devices::network::manager::NETWORK_MANAGER;
 
 const GOOLOG_TARGET: &str = "IP ROUTE";
 
@@ -51,10 +51,10 @@ pub fn ip_route_show() -> Result<(), CliError> {
     ];
 
     trace!("Locking NETWORK_INTERFACES mutex...");
-    let mut network_interfaces = NETWORK_INTERFACES.write();
+    let mut network_manager = NETWORK_MANAGER.lock();
 
-    for (name, interface) in network_interfaces.iter_mut() {
-        interface.routes_mut().update(|route_list| {
+    for (name, device) in network_manager.interfaces.iter_mut() {
+        device.interface.routes_mut().update(|route_list| {
             for route in route_list.iter() {
                 let expires_at = match route.expires_at {
                     None => String::new(),
@@ -82,10 +82,11 @@ pub fn ip_route_add(ip_address: IpCidr, interface_name: &str, gateway: IpAddress
     trace!("IP ROUTE ADD");
 
     trace!("Locking NETWORK_INTERFACES mutex...");
-    let mut network_interfaces = NETWORK_INTERFACES.write();
+    let mut network_manager = NETWORK_MANAGER.lock();
 
     trace!("Retrieving network interface \"{}\"", interface_name);
-    let iface = network_interfaces.get_mut(interface_name).unwrap();
+    let device = network_manager.interfaces.get_mut(interface_name).unwrap();
+    let iface = &mut device.interface;
 
     info!("Adding IP route");
     iface.routes_mut().update(|routes| {
@@ -106,10 +107,11 @@ pub fn ip_route_delete(ip_address: IpCidr, interface_name: &str) -> Result<(), C
     trace!("IP ROUTE DELETE");
 
     trace!("Locking NETWORK_INTERFACES mutex...");
-    let mut network_interfaces = NETWORK_INTERFACES.write();
+    let mut network_manager = NETWORK_MANAGER.lock();
 
     trace!("Retrieving network interface \"{}\"", interface_name);
-    let iface = network_interfaces.get_mut(interface_name).unwrap();
+    let device = network_manager.interfaces.get_mut(interface_name).unwrap();
+    let iface = &mut device.interface;
 
     debug!("Finding IP route");
     let mut was_route_found = false;

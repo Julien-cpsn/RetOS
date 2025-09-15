@@ -5,19 +5,19 @@ edition = "2021"
 
 [dependencies]
 # CPU
-bootloader_api = "0.11.10"
+bootloader_api = "0.11.12"
 x86_64 = "0.15.2"
 
 # Alloc
 spin = { version = "0.10.0", features = ["lazy"] }
-talc = { version = "4.4.2", features = ["counters"] }
+talc = { version = "4.4.3", features = ["counters"] }
 
 # Async
 crossbeam-queue = { version = "0.3.12", default-features = false, features = ["alloc", "nightly"] }
 futures-util = { version = "0.3.31", default-features = false, features = ["alloc", "async-await", "sink"] }
 
 # Devices
-uart_16550 = { version = "0.3.2", features = ["nightly"] }
+uart_16550 = { version = "0.4.0", features = ["nightly"] }
 pc-keyboard = "0.8.0"
 pic8259 = "0.11.0"
 acpi = "5.2.0"
@@ -31,7 +31,7 @@ smoltcp = { version = "0.12.0", default-features = false, features = ["alloc", "
 embedded-cli = "0.2.1"
 
 # Errors
-thiserror = { version = "2.0.12", default-features = false }
+thiserror = { version = "2.0.16", default-features = false }
 
 # Log
 goolog = "0.11.0"
@@ -39,7 +39,7 @@ goolog = "0.11.0"
 # Utils
 smallvec = "1.14.0"
 accessor = "0.3.3"
-strum = { version = "0.27.1", default-features = false, features = ["derive"] }
+strum = { version = "0.27.2", default-features = false, features = ["derive"] }
 paste = "1.0.15"
 noto-sans-mono-bitmap = { version = "0.3.1", default-features = false, features = ["regular", "size_16", "bold", "unicode-basic-latin", "unicode-specials", "unicode-latin-1-supplement", "unicode-latin-extended-a"]}
 yansi = { version = "1.0.1", default-features = false, features = ["alloc"]}

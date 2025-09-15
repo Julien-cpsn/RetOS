@@ -1,15 +1,16 @@
-use crate::devices::network_controller::{register_network_controller, NetworkController};
-use crate::devices::network::device::RECEIVED_FRAMES;
 use crate::devices::pci::{PciDevice, PCI_ACCESS};
 use crate::memory::tables::translate_addr;
 use alloc::boxed::Box;
+use alloc::sync::Arc;
 use alloc::vec::Vec;
+use crossbeam_queue::SegQueue;
 use goolog::{debug};
 use pci_types::{CommandRegister, EndpointHeader, PciHeader};
 use spin::Mutex;
 use x86_64::instructions::interrupts;
 use x86_64::instructions::port::Port;
 use x86_64::VirtAddr;
+use crate::devices::network::manager::NETWORK_MANAGER;
 
 const GOOLOG_TARGET: &str = "RTL8139";
 
@@ -46,11 +47,12 @@ const SYS_ERR: u16 = 0b1000_0000_0000_0000;
 #[derive(Debug)]
 pub struct RTL8139 {
     pub mac: [u8; 6],
-    pub state: Rtl8139State,
+    state: Rtl8139State,
+    frames: SegQueue<Vec<u8>>,
 }
 
 #[derive(Debug)]
-pub struct Rtl8139State {
+struct Rtl8139State {
     pub config_1: Port<u32>,
     pub cmd_reg: Mutex<Port<u8>>,
     pub rbstart: Port<u32>,
@@ -94,10 +96,12 @@ pub fn init_rtl8139(pci_device: &PciDevice) {
     let bar0 = pci_endpoint_header.bar(0, &PCI_ACCESS).unwrap();
     let io_base = bar0.unwrap_io();
 
-    let mut rtl8139 = unsafe { RTL8139::new(io_base as u16) };
+    let mut rtl8139 = RTL8139::new(io_base as u16);
     rtl8139.load();
 
-    register_network_controller(NetworkController::RTL8139(Box::from(rtl8139)), line as u32);
+    NETWORK_MANAGER
+        .lock()
+        .register_device(line, Arc::new(Mutex::new(rtl8139)));
 }
 
 impl RTL8139 {
@@ -109,7 +113,7 @@ impl RTL8139 {
     /// # Safety
     /// The caller of this function must pass a valid port base for a valid PCI device. Furthermore
     /// the caller must ensure that mastering and interrupts for the PCI device are enabled.
-    pub unsafe fn new(base: u16) -> Self {
+    pub fn new(base: u16) -> Self {
         debug!("Preloading RTL8139");
         let inner = Rtl8139State {
             config_1: Port::new(base + 0x52),
@@ -157,6 +161,7 @@ impl RTL8139 {
         Self {
             mac: [0xff, 0xff, 0xff, 0xff, 0xff, 0xff],
             state: inner,
+            frames: SegQueue::new(),
         }
     }
 
@@ -220,6 +225,11 @@ impl RTL8139 {
         debug!("RTL8139 loaded");
     }
 
+    pub fn pending_interrupt(&self) -> bool {
+        let isr = unsafe { self.state.ack.lock().read() };
+        isr != 0
+    }
+
     /// Function that we need to call when we receive an interrupt for this device.
     /// The callee must ensure that the PIC/APIC has received an EOI.
     pub fn on_interrupt(&self) {
@@ -229,7 +239,7 @@ impl RTL8139 {
 
         if (isr & RX_OK) != 0 {
             while (unsafe { self.state.cmd_reg.lock().read() } & RX_BUF_EMPTY) == 0 {
-                RECEIVED_FRAMES.push(self.state.rok());
+                self.frames.push(self.state.rok());
             }
         }
 
@@ -243,6 +253,10 @@ impl RTL8139 {
         interrupts::without_interrupts(|| unsafe {
             self.state.write(buffer)
         });
+    }
+
+    pub fn recv_sync(&mut self) -> Option<Vec<u8>> {
+        self.frames.pop()
     }
 }
 

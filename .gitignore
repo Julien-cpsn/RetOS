@@ -5,4 +5,4 @@
 /.idea
 
 # Wireshark network traffic
-dump.pcap
+*.pcap

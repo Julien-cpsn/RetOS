@@ -1,15 +1,14 @@
+use crate::devices::pic::pic::{PicType, PIC};
 use crate::interrupts::interrupt::InterruptIndex;
 use crate::memory::allocator::BOOT_INFO_FRAME_ALLOCATOR;
 use crate::memory::tables::MAPPER;
 use acpi::platform::interrupt;
 use alloc::alloc::Global;
 use core::ops::DerefMut;
-use core::ptr;
 use spin::Mutex;
 use x86_64::instructions::port::Port;
 use x86_64::structures::paging::{Mapper, Page, PageTableFlags, PhysFrame, Size4KiB};
 use x86_64::{PhysAddr, VirtAddr};
-use crate::devices::pic::pic::{PicType, PIC};
 
 #[allow(non_camel_case_types)]
 #[derive(Debug, Clone, Copy)]
@@ -82,6 +81,7 @@ pub enum APICOffset {
     R0x3F0 = 0x3F0,   // RESERVED = 0x3F0
 }
 
+#[derive(Default)]
 pub struct Apic {
     io: *mut u32,
     local: *mut u32
@@ -90,20 +90,11 @@ pub struct Apic {
 unsafe impl Send for Apic {}
 unsafe impl Sync for Apic {}
 
-impl Default for Apic {
-    fn default() -> Self {
-        Apic {
-            io: ptr::null_mut(),
-            local: ptr::null_mut(),
-        }
-    }
-}
-
 impl Apic {
     pub fn init_apic(apic: interrupt::Apic<Global>) {
         PIC.call_once(|| Mutex::new(PicType::APIC(Apic::default())));
-        Apic::init_io_apic(apic.io_apics[0].address as u64);
         Apic::init_local_apic(apic.local_apic_address);
+        Apic::init_io_apic(apic.io_apics[0].address as u64);
         Apic::disable_legacy_pic();
     }
     
@@ -116,7 +107,6 @@ impl Apic {
 
         unsafe {
             apic.init_timer();
-            apic.init_keyboard();
         }
     }
 
@@ -127,34 +117,63 @@ impl Apic {
         let virt_addr = Apic::map_apic(io_apic_address);
         apic.io = virt_addr.as_mut_ptr::<u32>();
 
-        apic.register_interrupt(0x12, InterruptIndex::Keyboard);
-        apic.register_interrupt(0x18, InterruptIndex::Serial1);
+        let apic_id = apic.local_apic_id();
+
+        apic.register_ioapic_interrupt(1, InterruptIndex::Keyboard.as_u8(), apic_id);
+        apic.register_ioapic_interrupt(4, InterruptIndex::Serial1.as_u8(), apic_id);
     }
 
-    pub fn register_interrupt(&self, offset: u32, index: InterruptIndex) {
+    pub fn local_apic_id(&self) -> u8 {
         unsafe {
-            self.io.offset(0).write_volatile(offset);
-            self.io.offset(4).write_volatile(index as u32);
+            // APIC ID Register is at offset 0x20 (divided by 4 = index 0x8)
+            let ir = self.local.offset(APICOffset::Ir as isize / 4);
+            let value = ir.read_volatile();
+            ((value >> 24) & 0xFF) as u8
+        }
+    }
+
+    pub fn register_ioapic_interrupt(&self, irq: u8, vector: u8, dest_apic_id: u8) {
+        // IOAPIC register indices:
+        // redir_index_low  = 0x10 + 2*irq
+        // redir_index_high = 0x10 + 2*irq + 1
+        let redir_low_index = 0x10 + (irq as u32 * 2);
+        let redir_high_index = redir_low_index + 1;
+
+        let low = (vector as u32)
+            | (0 << 8)     // delivery = Fixed
+            | (0 << 11)    // dest mode = Physical
+            | (0 << 13)    // polarity = active-low
+            | (0 << 15)    // trigger = level-triggered
+            | (0 << 16);   // mask = 0 (enabled)
+
+        // High dword: destination APIC ID occupies bits 24..31
+        let high = (dest_apic_id as u32) << 24;
+
+        unsafe {
+            // select low register
+            self.io.offset(0).write_volatile(redir_low_index);
+            // write low dword to IOWIN (IOREGSEL + 0x10 == IOWIN; your offset(4) is correct)
+            self.io.offset(4).write_volatile(low);
+
+            // select high register
+            self.io.offset(0).write_volatile(redir_high_index);
+            // write high dword
+            self.io.offset(4).write_volatile(high);
         }
     }
 
     unsafe fn init_timer(&self) {
         let svr = self.local.offset(APICOffset::Svr as isize / 4);
-        svr.write_volatile(svr.read_volatile() | 0x100); // Set bit 8
+        svr.write_volatile(svr.read_volatile() | 0x100); // enable LAPIC
 
-        let lvt_lint1 = self.local.offset(APICOffset::LvtT as isize / 4);
-        lvt_lint1.write_volatile(0x20 | (1 << 17)); // Vector 0x20, periodic mode
+        let lvt_timer = self.local.offset(APICOffset::LvtT as isize / 4);
+        lvt_timer.write_volatile(InterruptIndex::Timer as u32 | (1 << 17)); // Vector 0x20, periodic mode
 
         let tdcr = self.local.offset(APICOffset::Tdcr as isize / 4);
-        tdcr.write_volatile(0x3); // Divide by 16 mode
+        tdcr.write_volatile(0x3); // Divide by 16
 
         let ticr = self.local.offset(APICOffset::Ticr as isize / 4);
-        ticr.write_volatile(0x100000); // An arbitrary value for the initial value of the timer
-    }
-
-    unsafe fn init_keyboard(&self) {
-        let keyboard_register = self.local.offset(APICOffset::LvtLint1 as isize / 4);
-        keyboard_register.write_volatile(InterruptIndex::Keyboard as u8 as u32);
+        ticr.write_volatile(0x100000); // initial count
     }
 
     fn map_apic(physical_address: u64) -> VirtAddr {
@@ -185,10 +204,50 @@ impl Apic {
         }
     }
 
-    pub unsafe fn end_interrupt(&mut self) {
-        self
-            .local
-            .offset(APICOffset::Eoi as isize / 4)
-            .write_volatile(0)
+    pub fn end_interrupt(&mut self) {
+        unsafe {
+            self
+                .local
+                .offset(APICOffset::Eoi as isize / 4)
+                .write_volatile(0)
+        }
+    }
+
+    pub fn get_interrupt_vector(&self) -> Option<u8> {
+        // There are 8 ISR registers, each 32 bits wide, covering vectors 0-255
+        // ISR1 covers vectors 0-31, ISR2 covers 32-63, etc.
+        let isr_registers = [
+            APICOffset::Isr1,
+            APICOffset::Isr2,
+            APICOffset::Isr3,
+            APICOffset::Isr4,
+            APICOffset::Isr5,
+            APICOffset::Isr6,
+            APICOffset::Isr7,
+            APICOffset::Isr8,
+        ];
+
+        unsafe {
+            // Check each ISR register for bits that are set
+            for (index, &register) in isr_registers.iter().enumerate() {
+                let register_value = self.local.offset(register as isize / 4).read_volatile();
+
+                // If the register has any bits set, find the highest priority one
+                if register_value != 0 {
+                    // Calculate which bit is set (using trailing zeros)
+                    let bit_position = register_value.trailing_zeros();
+
+                    // Calculate the vector number
+                    // Each register covers 32 vectors, so we multiply the register index by 32
+                    // and add the bit position
+                    let vector = (index as u8 * 32) + bit_position as u8;
+
+                    return Some(vector);
+                }
+            }
+        }
+
+        // No interrupt is in service
+        None
     }
 }
