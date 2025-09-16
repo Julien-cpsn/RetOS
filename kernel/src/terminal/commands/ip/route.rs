@@ -21,7 +21,7 @@ add_verbosity! {
 
         /// Add an IP route to an interface
         Add {
-            /// IP route to add to the interface
+            /// IP with Cidr route to add to the interface
             address: IpCidrArg,
 
             /// Interface to add the route to
@@ -34,7 +34,7 @@ add_verbosity! {
         
         /// Delete an IP route from an interface
         Delete {
-            /// IP route to delete from the interface
+            /// IP with Cidr route to delete from the interface
             address: IpCidrArg,
 
             /// Interface to delete the route from
@@ -54,21 +54,25 @@ pub fn ip_route_show() -> Result<(), CliError> {
     let mut network_manager = NETWORK_MANAGER.lock();
 
     for (name, device) in network_manager.interfaces.iter_mut() {
-        device.interface.routes_mut().update(|route_list| {
-            for route in route_list.iter() {
-                let expires_at = match route.expires_at {
-                    None => String::new(),
-                    Some(instant) => instant.to_string()
-                };
+        let mut locked_device = device.lock();
 
-                let preferred_until = match route.preferred_until {
-                    None => String::new(),
-                    Some(instant) => instant.to_string()
-                };
-                
-                table.push([name.to_string(), route.cidr.to_string(), route.via_router.to_string(), expires_at, preferred_until]);
-            }
-        });
+        locked_device.interface
+            .routes_mut()
+            .update(|route_list| {
+                for route in route_list.iter() {
+                    let expires_at = match route.expires_at {
+                        None => String::new(),
+                        Some(instant) => instant.to_string()
+                    };
+
+                    let preferred_until = match route.preferred_until {
+                        None => String::new(),
+                        Some(instant) => instant.to_string()
+                    };
+
+                    table.push([name.to_string(), route.cidr.to_string(), route.via_router.to_string(), expires_at, preferred_until]);
+                }
+            });
     }
     trace!("NETWORK_INTERFACES mutex freed");
 
@@ -86,7 +90,8 @@ pub fn ip_route_add(ip_address: IpCidr, interface_name: &str, gateway: IpAddress
 
     trace!("Retrieving network interface \"{}\"", interface_name);
     let device = network_manager.interfaces.get_mut(interface_name).unwrap();
-    let iface = &mut device.interface;
+    let mut locked_device = device.lock();
+    let iface = &mut locked_device.interface;
 
     info!("Adding IP route");
     iface.routes_mut().update(|routes| {
@@ -111,7 +116,8 @@ pub fn ip_route_delete(ip_address: IpCidr, interface_name: &str) -> Result<(), C
 
     trace!("Retrieving network interface \"{}\"", interface_name);
     let device = network_manager.interfaces.get_mut(interface_name).unwrap();
-    let iface = &mut device.interface;
+    let mut locked_device = device.lock();
+    let iface = &mut locked_device.interface;
 
     debug!("Finding IP route");
     let mut was_route_found = false;

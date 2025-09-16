@@ -41,7 +41,8 @@ pub fn ip_address_add(ip_address: IpCidr, interface_name: &str) -> Result<(), Cl
 
     trace!("Retrieving network interface \"{}\"", interface_name);
     let device = network_manager.interfaces.get_mut(interface_name).unwrap();
-    let iface = &mut device.interface;
+    let mut locked_device = device.lock();
+    let iface = &mut locked_device.interface;
 
     info!("Adding IP address");
     iface.update_ip_addrs(|addrs| {
@@ -62,7 +63,8 @@ pub fn ip_address_delete(ip_address: IpCidr, interface_name: &str) -> Result<(),
 
     trace!("Retrieving network interface \"{}\"", interface_name);
     let device = network_manager.interfaces.get_mut(interface_name).unwrap();
-    let iface = &mut device.interface;
+    let mut locked_device = device.lock();
+    let iface = &mut locked_device.interface;
 
     debug!("Finding IP address");
     let mut was_address_found = false;

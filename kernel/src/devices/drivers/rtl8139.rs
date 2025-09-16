@@ -225,17 +225,16 @@ impl RTL8139 {
         debug!("RTL8139 loaded");
     }
 
-    pub fn pending_interrupt(&self) -> bool {
-        let isr = unsafe { self.state.ack.lock().read() };
-        isr != 0
-    }
-
     /// Function that we need to call when we receive an interrupt for this device.
     /// The callee must ensure that the PIC/APIC has received an EOI.
-    pub fn on_interrupt(&self) {
+    pub fn on_interrupt(&self) -> bool {
         // At some point here we will want to also wake the network stack because there are packets
         // available.
         let isr = unsafe { self.state.ack.lock().read() };
+
+        if isr == 0 {
+            return false;
+        }
 
         if (isr & RX_OK) != 0 {
             while (unsafe { self.state.cmd_reg.lock().read() } & RX_BUF_EMPTY) == 0 {
@@ -246,6 +245,8 @@ impl RTL8139 {
         unsafe {
             self.state.ack.lock().write(isr);
         }
+
+        return true;
     }
 
     /// FIXME: Disable interrupts for the PCI device only instead of globally.

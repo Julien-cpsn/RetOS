@@ -30,13 +30,10 @@ impl NetworkController {
     pub fn process_interrupt(&self) -> bool {
         let mut network_driver = self.driver.lock();
 
-        if !network_driver.has_pending_interrupt() {
-            return false;
-        }
-
-        network_driver.handle_interrupt();
-        if let Some(packet) = network_driver.receive_packet() {
-            *self.rx_buffer.borrow_mut() = Some(packet);
+        if network_driver.handle_interrupt() {
+            if let Some(packet) = network_driver.receive_packet() {
+                *self.rx_buffer.borrow_mut() = Some(packet);
+            }
         }
 
         return true;

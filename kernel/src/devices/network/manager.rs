@@ -1,4 +1,3 @@
-use crate::clock::Clock;
 use crate::devices::network::controller::NetworkController;
 use crate::devices::network::driver::NetworkDriver;
 use crate::devices::network::interface::{format_mac, init_loopback_interface, init_network_device_interface};
@@ -8,12 +7,10 @@ use alloc::sync::Arc;
 use alloc::{format, vec};
 use alloc::string::String;
 use alloc::vec::Vec;
-use core::cell::RefCell;
-use goolog::info;
+use goolog::{info, trace};
 use smoltcp::iface::{Interface, SocketSet};
 use spin::{Lazy, Mutex};
 use crate::devices::network::device::NetworkDevice;
-use crate::println;
 
 const GOOLOG_TARGET: &str = "NETWORK";
 
@@ -24,7 +21,7 @@ pub static NETWORK_MANAGER: Lazy<Mutex<NetworkManager>> = Lazy::new(|| Mutex::ne
 pub struct NetworkManager<'a> {
     pub irq_to_devices: BTreeMap<u8, Vec<String>>,
     pub loopback: Interface,
-    pub interfaces: BTreeMap<String, NetworkDevice<'a>>
+    pub interfaces: BTreeMap<String, Arc<Mutex<NetworkDevice<'a>>>>
 }
 
 impl Default for NetworkManager<'_> {
@@ -57,22 +54,22 @@ impl NetworkManager<'_> {
         let device = NetworkDevice {
             interface,
             network_controller,
-            sockets: RefCell::new(SocketSet::new(vec![])),
+            sockets: Arc::new(Mutex::new(SocketSet::new(vec![]))),
         };
 
         let device_index = self.interfaces.len();
         let number_lines = self.irq_to_devices.len();
 
-        self.interfaces.insert(name.clone(), device);
+        self.interfaces.insert(name.clone(), Arc::new(Mutex::new(device)));
 
         // Map interrupt line to interface id
         self.irq_to_devices.entry(interrupt_line).or_default().push(name);
 
-        println!("Index: {}, line: 0x{:X}", device_index, interrupt_line);
+        trace!("Interface: eth{}, line: 0x{:X}", device_index, interrupt_line);
 
         if self.irq_to_devices.get(&interrupt_line).unwrap().len() == 1 {
             let shared_vector = NETWORK_DEVICES_INTERRUPT_IRQ + number_lines as u8;
-            println!("Registered vector: 0x{:X}", shared_vector);
+            trace!("Registered interrupt vector: 0x{:X}", shared_vector);
 
             PIC
                 .get()
@@ -87,6 +84,8 @@ impl NetworkManager<'_> {
             return;
         };
 
+        trace!("Handling network interrupt");
+
         for device_index in devices {
             // iterate all devices that use this vector
             let Some(device) = self.interfaces.get_mut(device_index) else {
@@ -94,17 +93,18 @@ impl NetworkManager<'_> {
             };
 
             // check the NIC's ISR/status register and clear its interrupt sources.
-            if !device.network_controller.process_interrupt() {
-                continue;
-            }
+            device.lock().network_controller.process_interrupt();
+        }
+    }
 
+    pub fn poll_interfaces(&mut self) {
+        trace!("Polling interfaces");
+
+        for device in self.interfaces.values_mut() {
             // let smoltcp process the packets the driver delivered
-            let timestamp = Clock::now();
-            device.interface.poll(
-                timestamp,
-                &mut device.network_controller,
-                &mut device.sockets.borrow_mut()
-            );
+            if let Some(mut locked_device) = device.try_lock() {
+                locked_device.poll();
+            }
         }
     }
 }

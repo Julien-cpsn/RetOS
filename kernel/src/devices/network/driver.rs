@@ -8,8 +8,7 @@ pub trait NetworkDriver: Send + Sync + Debug {
     fn mac(&self) -> [u8; 6];
     fn device_name(&self) -> &str;
     fn nic_type(&self) -> NetworkControllerType;
-    fn has_pending_interrupt(&self) -> bool;
-    fn handle_interrupt(&mut self);
+    fn handle_interrupt(&mut self) -> bool;
     fn send_packet(&mut self, data: &[u8]);
     fn receive_packet(&mut self) -> Option<Vec<u8>>;
 }
@@ -33,12 +32,8 @@ impl NetworkDriver for E1000 {
         NetworkControllerType::E1000
     }
 
-    fn has_pending_interrupt(&self) -> bool {
-        self.pending_interrupt()
-    }
-
-    fn handle_interrupt(&mut self) {
-        self.on_interrupt();
+    fn handle_interrupt(&mut self) -> bool {
+        self.on_interrupt()
     }
 
     fn send_packet(&mut self, data: &[u8]) {
@@ -63,12 +58,8 @@ impl NetworkDriver for RTL8139 {
         NetworkControllerType::RTL8139
     }
 
-    fn has_pending_interrupt(&self) -> bool {
-        self.pending_interrupt()
-    }
-
-    fn handle_interrupt(&mut self) {
-        self.on_interrupt();
+    fn handle_interrupt(&mut self) -> bool {
+        self.on_interrupt()
     }
 
     fn send_packet(&mut self, data: &[u8]) {

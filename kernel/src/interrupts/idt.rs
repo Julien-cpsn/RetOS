@@ -1,5 +1,6 @@
 use crate::clock::tick_handler;
-use crate::devices::network::manager::{NETWORK_DEVICES_INTERRUPT_IRQ, NETWORK_MANAGER};
+use crate::devices::network::interrupt::{process_pending_network_irqs, PENDING_NETWORK_IRQS};
+use crate::devices::network::manager::NETWORK_DEVICES_INTERRUPT_IRQ;
 use crate::devices::pic::pic::PIC;
 use crate::devices::serial::SERIAL1;
 use crate::interrupts::gdt;
@@ -69,6 +70,9 @@ extern "x86-interrupt" fn double_fault_handler(stack_frame: InterruptStackFrame,
 
 extern "x86-interrupt" fn timer_interrupt_handler(_stack_frame: InterruptStackFrame) {
     tick_handler();
+
+    // TODO: can be placed in a task when SMP is on
+    process_pending_network_irqs();
 
     PIC
         .get()
@@ -140,20 +144,15 @@ pub extern "x86-interrupt" fn network_packet_handler_3(_stack_frame: InterruptSt
 
 
 fn network_packet_handler(interrupt_line: u8) {
-    println!("Received packet");
+    //println!("Received packet");
 
-    let mut pic = PIC
+    PENDING_NETWORK_IRQS.push(interrupt_line);
+
+    PIC
         .get()
         .unwrap()
-        .lock();
-
-    //println!("0x{:X}", interrupt_line);
-
-    if let Some(mut network_manager) = NETWORK_MANAGER.try_lock() {
-        network_manager.handle_interrupt(interrupt_line)
-    }
-
-    pic.end_interrupt();
+        .lock()
+        .end_interrupt();
 }
 
 extern "x86-interrupt" fn page_fault_handler(stack_frame: InterruptStackFrame, error_code: PageFaultErrorCode) {

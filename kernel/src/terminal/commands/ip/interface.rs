@@ -32,7 +32,9 @@ pub fn ip_interface_show() -> Result<(), CliError> {
     table.push(row_from_interface(String::from("lo"), String::from("Loopback"), &network_manager.loopback));
     
     for (name, device) in network_manager.interfaces.iter() {
-        let nic_name = device.network_controller.driver.lock().nic_type().to_string();
+        let device = device.lock();
+        let driver = device.network_controller.driver.lock();
+        let nic_name = driver.nic_type().to_string();
         table.push(row_from_interface(name.clone(), nic_name, &device.interface))
     }
 

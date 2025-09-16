@@ -438,16 +438,14 @@ impl E1000 {
         self.write_register(REG_INTERRUPT_MASK, old_mask | INTERRUPT_MASK);
     }
 
-    pub fn pending_interrupt(&self) -> bool {
-        let interrupt_cause = self.read_register(REG_INTERRUPT_CAUSE);
-
-        interrupt_cause != 0
-    }
-
     /// Function that handles interrupts from the E1000
-    pub fn on_interrupt(&self) {
+    pub fn on_interrupt(&self) -> bool {
         // Read the interrupt cause register
         let interrupt_cause = self.read_register(REG_INTERRUPT_CAUSE);
+
+        if interrupt_cause == 0 {
+            return false;
+        }
 
         // Clear interrupts by writing back the value
         self.write_register(REG_INTERRUPT_CAUSE, interrupt_cause);
@@ -504,6 +502,8 @@ impl E1000 {
                 
             }
         }
+
+        return true;
     }
 
     fn reset_rx_ring(&self) {
