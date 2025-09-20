@@ -52,7 +52,8 @@ impl Device for NetworkController {
                 PhyRxToken { device: self },
                 PhyTxToken { device: self }
             ))
-        } else {
+        }
+        else {
             None
         }
     }
@@ -82,7 +83,8 @@ impl<'a> RxToken for PhyRxToken<'a> {
         let mut buffer = self.device.rx_buffer.borrow_mut();
         if let Some(packet) = buffer.take() {
             f(&packet)
-        } else {
+        }
+        else {
             // This shouldn't happen if we properly handle interrupts
             panic!("RxToken consumed without available packet");
         }

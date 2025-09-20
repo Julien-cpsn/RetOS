@@ -7,13 +7,29 @@ use alloc::string::String;
 use alloc::vec;
 use byteorder::{ByteOrder, NetworkEndian};
 use goolog::{trace};
+use no_std_clap_macros::Args;
 use smoltcp::phy::Device;
 use smoltcp::socket::icmp::{Endpoint, PacketBuffer, PacketMetadata, Socket};
 use smoltcp::time::{Duration, Instant};
 use smoltcp::wire::{Icmpv4Packet, Icmpv4Repr, Icmpv6Packet, Icmpv6Repr, IpAddress};
 use crate::devices::network::manager::NETWORK_MANAGER;
+use crate::terminal::custom_arguments::ip_address::IpAddressArg;
 
 const GOOLOG_TARGET: &str = "PING";
+
+#[derive(Args)]
+pub struct PingCommand {
+    /// IP address to ping
+    pub ip_address: IpAddressArg,
+
+    /// Ping count
+    #[arg(default_value = "4")]
+    pub count: u16,
+
+    /// Timeout
+    #[arg(default_value = "2")]
+    pub timeout: u64
+}
 
 pub fn ping(remote_addr: IpAddress, count: u16, timeout: u64) -> Result<(), CliError> {
     trace!("PING");

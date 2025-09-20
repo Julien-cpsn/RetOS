@@ -1,36 +1,39 @@
-use crate::add_verbosity;
-use crate::terminal::arguments::ip_address::{IpCidrArg};
-use crate::terminal::arguments::network_interface::NetworkInterfaceArg;
+use crate::devices::network::manager::NETWORK_MANAGER;
+use crate::terminal::custom_arguments::ip_address::IpCidrArg;
+use crate::terminal::custom_arguments::network_interface::NetworkInterfaceArg;
 use crate::terminal::error::CliError;
 use alloc::format;
-use embedded_cli::Command;
 use goolog::{debug, info, trace};
+use no_std_clap_macros::{Args, Subcommand};
 use smoltcp::wire::{IpCidr};
-use crate::devices::network::manager::NETWORK_MANAGER;
 
 const GOOLOG_TARGET: &str = "IP ADDRESS";
 
-add_verbosity! {
-    #[derive(Command)]
-    pub enum IpAddressCommand<'a> {
-        /// Add an IP address to an interface
-        Add {
-            /// IP address to add to the interface
-            address: IpCidrArg,
+#[derive(Subcommand)]
+pub enum IpAddressCommand {
+    /// Add an IP address to an interface
+    Add(IpAddressAddCommand),
 
-            /// Interface to add the address to
-            interface_name: NetworkInterfaceArg<'a>,
-        },
+    /// Delete an IP address from an interface
+    Delete(IpAddressDeleteCommand),
+}
 
-        /// Delete an IP address from an interface
-        Delete {
-            /// IP address to delete from the interface
-            address: IpCidrArg,
+#[derive(Args)]
+pub struct IpAddressAddCommand {
+    /// IP address to add to the interface
+    pub address: IpCidrArg,
 
-            /// Interface to delete the address from
-            interface_name: NetworkInterfaceArg<'a>,
-        }
-    }
+    /// Interface to add the address to
+    pub interface_name: NetworkInterfaceArg,
+}
+
+#[derive(Args)]
+pub struct IpAddressDeleteCommand {
+    /// IP address to delete from the interface
+    pub address: IpCidrArg,
+
+    /// Interface to delete the address from
+    pub interface_name: NetworkInterfaceArg,
 }
 
 pub fn ip_address_add(ip_address: IpCidr, interface_name: &str) -> Result<(), CliError> {

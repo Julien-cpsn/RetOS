@@ -1,10 +1,9 @@
-use crate::add_verbosity;
 use crate::printer::buffer::WRITER;
 use crate::terminal::error::CliError;
 use alloc::string::{String, ToString};
 use alloc::{vec};
-use embedded_cli::Command;
 use goolog::trace;
+use no_std_clap_macros::Subcommand;
 use smoltcp::iface::Interface;
 use smoltcp::wire::IpCidr;
 use crate::devices::network::interface::format_mac;
@@ -12,12 +11,10 @@ use crate::devices::network::manager::NETWORK_MANAGER;
 
 const GOOLOG_TARGET: &str = "IP INTERFACE";
 
-add_verbosity! {
-    #[derive(Command)]
-    pub enum IpInterfaceCommand {
-        /// Show network interfaces
-        Show
-    }
+#[derive(Subcommand)]
+pub enum IpInterfaceCommand {
+    /// Show network interfaces
+    Show
 }
 
 pub fn ip_interface_show() -> Result<(), CliError> {

@@ -316,7 +316,8 @@ impl E1000 {
             self.mac[3] = ((low >> 24) & 0xFF) as u8;
             self.mac[4] = (high & 0xFF) as u8;
             self.mac[5] = ((high >> 8) & 0xFF) as u8;
-        } else {
+        }
+        else {
             // Read from RAL0/RAH0 registers which may be pre-programmed
 
             let low = self.read_register(REG_RAL0);

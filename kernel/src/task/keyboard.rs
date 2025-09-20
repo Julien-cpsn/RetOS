@@ -1,15 +1,20 @@
+use crate::printer::buffer::WRITER;
+use crate::terminal::args::CliArgs;
+use crate::terminal::cli::{handle_command, set_max_verbosity, Cli};
 use crate::println;
-use crate::terminal::cli::handle_command;
-use crate::terminal::terminal::TerminalBuffer;
+use alloc::format;
+use alloc::string::ToString;
 use core::pin::Pin;
 use core::task::{Context, Poll};
 use crossbeam_queue::ArrayQueue;
-use embedded_cli::cli::CliBuilder;
 use futures_util::task::AtomicWaker;
 use futures_util::{Stream, StreamExt};
 use goolog::set_target;
+use no_std_clap_core::error::ParseError;
+use no_std_clap_core::parser::Parser;
 use pc_keyboard::{DecodedKey, KeyCode};
 use spin::Once;
+use yansi::Paint;
 
 static SCANCODE_QUEUE: Once<ArrayQueue<DecodedKey>> = Once::new();
 static WAKER: AtomicWaker = AtomicWaker::new();
@@ -74,54 +79,46 @@ pub async fn handle_keyboard() {
 
     println!("======= User input starts =======");
 
-    let mut terminal_buffer = TerminalBuffer;
-    let command_buffer: [u8; 100] = [0; 100];
-    let history_buffer: [u8; 100] = [0; 100];
-
-    let mut cli = CliBuilder::default()
-        .writer(&mut terminal_buffer)
-        .command_buffer(command_buffer)
-        .history_buffer(history_buffer)
-        .prompt("> ")
-        .build()
-        .ok()
-        .unwrap();
+    let mut cli = Cli::new(
+        format!("{}{} ", "RetOS".dim(), '$'.white()),
+        7,
+        WRITER.clone()
+    );
 
     while let Some(key) = scancodes.next().await {
         match key {
-            DecodedKey::Unicode(character) => handle_command(&mut cli, character as u8),
             DecodedKey::RawKey(key) => match key {
-                KeyCode::ArrowUp => {
-                    handle_command(&mut cli, 0x1B);
-                    handle_command(&mut cli, b'[');
-                    handle_command(&mut cli, b'1');
-                    handle_command(&mut cli, b'A');
-                },
-                KeyCode::ArrowDown => {
-                    handle_command(&mut cli, 0x1B);
-                    handle_command(&mut cli, b'[');
-                    handle_command(&mut cli, b'1');
-                    handle_command(&mut cli, b'B');
-                },
-                KeyCode::ArrowRight => {
-                    handle_command(&mut cli, 0x1B);
-                    handle_command(&mut cli, b'[');
-                    handle_command(&mut cli, b'1');
-                    handle_command(&mut cli, b'C');
-                },
-                KeyCode::ArrowLeft => {
-                    handle_command(&mut cli, 0x1B);
-                    handle_command(&mut cli, b'[');
-                    handle_command(&mut cli, b'1');
-                    handle_command(&mut cli, b'D');
-                },
-                KeyCode::Backspace => {
-                    handle_command(&mut cli, 0x1B);
-                    handle_command(&mut cli, b'[');
-                    handle_command(&mut cli, b'D');
-                },
+                KeyCode::Escape => {}
+                KeyCode::Backspace => {}
+                KeyCode::Tab => {}
+                KeyCode::Delete => {}
+                KeyCode::End => {}
+                KeyCode::Return => {}
+                KeyCode::ArrowUp => cli.previous_command(),
+                KeyCode::ArrowDown => cli.next_command(),
+                KeyCode::ArrowLeft => cli.move_cursor_left(),
+                KeyCode::ArrowRight => cli.move_cursor_right(),
                 _ => {}
-            }
+            },
+            DecodedKey::Unicode(char) => {
+                if let Some(command) = cli.handle_scancode(char as u8) {
+                    match CliArgs::parse_str(&command) {
+                        Ok(cli_args) => {
+                            set_max_verbosity(cli_args.verbose);
+                            handle_command(cli_args.command);
+                        },
+                        Err(parse_error) => {
+                            match parse_error {
+                                ParseError::EmptyInput => {},
+                                ParseError::UnknownSubcommand => println!("Unknown command: {}", command),
+                                error => println!("{}", error.to_string())
+                            }
+                        }
+                    }
+
+                    cli.reset_line();
+                }
+            },
         }
     }
 }

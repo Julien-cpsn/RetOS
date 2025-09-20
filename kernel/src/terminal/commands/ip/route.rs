@@ -1,46 +1,49 @@
-use crate::{add_verbosity};
 use crate::printer::buffer::WRITER;
-use crate::terminal::arguments::ip_address::{IpAddressArg, IpCidrArg};
-use crate::terminal::arguments::network_interface::NetworkInterfaceArg;
 use crate::terminal::error::CliError;
+use crate::devices::network::manager::NETWORK_MANAGER;
+use crate::terminal::custom_arguments::ip_address::{IpAddressArg, IpCidrArg};
+use crate::terminal::custom_arguments::network_interface::NetworkInterfaceArg;
 use alloc::string::{String, ToString};
 use alloc::{format, vec};
-use embedded_cli::Command;
 use goolog::{debug, info, trace};
+use no_std_clap_macros::{Args, Subcommand};
 use smoltcp::iface::Route;
 use smoltcp::wire::{IpAddress, IpCidr};
-use crate::devices::network::manager::NETWORK_MANAGER;
 
 const GOOLOG_TARGET: &str = "IP ROUTE";
 
-add_verbosity! {
-    #[derive(Command)]
-    pub enum IpRouteCommand<'a> {
-        /// Show network routes
-        Show,
+#[derive(Subcommand)]
+pub enum IpRouteCommand {
+    /// Show network routes
+    Show,
 
-        /// Add an IP route to an interface
-        Add {
-            /// IP with Cidr route to add to the interface
-            address: IpCidrArg,
+    /// Add an IP route to an interface
+    Add(IpRouteAddCommand),
 
-            /// Interface to add the route to
-            interface_name: NetworkInterfaceArg<'a>,
+    /// Delete an IP route from an interface
+    Delete(IpRouteDeleteCommand)
+}
 
-            /// IP gateway. Defaults to: 0.0.0.0
-            #[arg(default_value_t = IpAddressArg(IpAddress::v4(0, 0, 0, 0)))]
-            gateway: IpAddressArg,
-        },
-        
-        /// Delete an IP route from an interface
-        Delete {
-            /// IP with Cidr route to delete from the interface
-            address: IpCidrArg,
+#[derive(Args)]
+pub struct IpRouteAddCommand {
+    /// IP with Cidr route to add to the interface
+    pub address: IpCidrArg,
 
-            /// Interface to delete the route from
-            interface_name: NetworkInterfaceArg<'a>,
-        }
-    }
+    /// Interface to add the route to
+    pub interface_name: NetworkInterfaceArg,
+
+    /// IP gateway. Defaults to: 0.0.0.0
+    #[arg(default_value = "0.0.0.0")]
+    pub gateway: IpAddressArg,
+}
+
+#[derive(Args)]
+pub struct IpRouteDeleteCommand {
+    /// IP with Cidr route to delete from the interface
+    pub address: IpCidrArg,
+
+    /// Interface to delete the route from
+    pub interface_name: NetworkInterfaceArg,
 }
 
 pub fn ip_route_show() -> Result<(), CliError> {

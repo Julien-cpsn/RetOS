@@ -28,8 +28,7 @@ const HELLO_WORLD: &str = r#"
 |  |  _  // _ \ __| |  | |\___ \   |
 |  | | \ \  __/ |_| |__| |____) |  |
 |  |_|  \_\___|\__|\____/|_____/   |
-\----------------------------------/
-"#;
+\----------------------------------/"#;
 
 pub static BOOTLOADER_CONFIG: BootloaderConfig = {
     let mut config = BootloaderConfig::new_default();

@@ -1,31 +1,31 @@
-use crate::add_group_verbosity;
 use crate::terminal::commands::ip::address::IpAddressCommand;
 use crate::terminal::commands::ip::interface::IpInterfaceCommand;
-use embedded_cli::Command;
 use crate::terminal::commands::ip::route::IpRouteCommand;
+use no_std_clap_macros::Subcommand;
 
-add_group_verbosity! {
-    #[derive(Command)]
-    pub enum IpCommand<'a> {
-        /// Interact with network interfaces
-        #[command(subcommand)]
-        Interface(IpInterfaceCommand),
+#[derive(Subcommand)]
+pub enum IpCommand {
+    /// Interact with network interfaces
+    #[command(subcommand)]
+    Interface(Option<IpInterfaceCommand>),
 
-        #[command(subcommand)]
-        I(IpInterfaceCommand),
+    /// Interact with network interfaces
+    #[command(subcommand)]
+    I(Option<IpInterfaceCommand>),
 
-        /// Interact with network addresses
-        #[command(subcommand)]
-        Address(IpAddressCommand<'a>),
+    /// Interact with network addresses
+    #[command(subcommand)]
+    Address(Option<IpAddressCommand>),
 
-        #[command(subcommand)]
-        A(IpAddressCommand<'a>),
+    /// Interact with network addresses
+    #[command(subcommand)]
+    A(Option<IpAddressCommand>),
 
-        /// Interact with network routes
-        #[command(subcommand)]
-        Route(IpRouteCommand<'a>),
+    /// Interact with network routes
+    #[command(subcommand)]
+    Route(Option<IpRouteCommand>),
 
-        #[command(subcommand)]
-        R(IpRouteCommand<'a>),
-    }
+    /// Interact with network routes
+    #[command(subcommand)]
+    R(Option<IpRouteCommand>),
 }

@@ -98,8 +98,6 @@ impl NetworkManager<'_> {
     }
 
     pub fn poll_interfaces(&mut self) {
-        trace!("Polling interfaces");
-
         for device in self.interfaces.values_mut() {
             // let smoltcp process the packets the driver delivered
             if let Some(mut locked_device) = device.try_lock() {
