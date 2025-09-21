@@ -1,3 +1,4 @@
+use crate::{print, println};
 use crate::printer::buffer::{Writer, BORDER_PADDING};
 use crate::terminal::args::{CliArgs, Commands};
 use crate::terminal::commands::clear::clear;
@@ -23,7 +24,6 @@ use core::fmt::Write;
 use goolog::log::set_max_level;
 use no_std_clap_core::parser::Parser;
 use spin::RwLock;
-use crate::print;
 
 pub struct Cli {
     prompt: String,
@@ -60,10 +60,6 @@ impl Cli {
         writer.clear_line();
         writer.write_str(&self.prompt).unwrap();
 
-        if let Some(index) = self.history_index {
-            self.line = self.history[index].clone();
-        }
-
         let line_length = self.line.len();
 
         if self.cursor_index > line_length || (line_from_history && self.cursor_index == 0) {
@@ -86,6 +82,7 @@ impl Cli {
             b'\n' => match self.line.is_empty() {
                 true => {
                     self.line.clear();
+                    self.print_current_line(false, false);
                     self.writer.write().newline();
                     self.history_index = None;
                     self.cursor_index = 0;
@@ -107,6 +104,10 @@ impl Cli {
                     return Some(command);
                 }
             },
+            // Tab
+            0x9 => {
+
+            },
             // Backspace
             0x8 => {
                 if self.cursor_index > 0 {
@@ -121,8 +122,8 @@ impl Cli {
                 }
             },
             _ => {
-                //crate::println!("{:X}", scancode);
-                //crate::println!("{}", self.cursor_index);
+                //println!("{:X}", scancode);
+                //println!("{}", self.cursor_index);
                 self.line.insert(self.cursor_index, scancode as char);
                 self.cursor_index += 1;
             }
@@ -149,6 +150,8 @@ impl Cli {
             }
         }
 
+        self.line = self.history[self.history_index.unwrap()].clone();
+
         self.print_current_line(true, true)
     }
 
@@ -160,6 +163,7 @@ impl Cli {
             }
             else {
                 *index += 1;
+                self.line = self.history[*index].clone();
             }
         }
         else {
@@ -231,7 +235,7 @@ pub fn handle_command(command: Commands) {
 
     if let Err(error) = result {
         use yansi::Paint;
-        print!("{} {}", "Error:".red(), error)
+        println!("{} {}", "Error:".red(), error)
     }
 }
 

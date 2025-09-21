@@ -1,3 +1,3 @@
 pub mod task;
 pub mod executor;
-pub mod keyboard;
+pub mod terminal;

@@ -10,7 +10,7 @@ impl FromArg for IpAddressArg {
     fn from_arg(arg: &str) -> Result<Self, ParseError> where Self: Sized {
         match IpAddress::from_str(arg) {
             Ok(ip_address) => Ok(IpAddressArg(ip_address)),
-            Err(_) => Err(ParseError::InvalidValue(format!("\"{arg}\", needed IPv4 or IPv6 address")))
+            Err(_) => Err(ParseError::InvalidValue(format!("\"{arg}\", need an IPv4 or IPv6 address")))
         }
     }
 }
@@ -21,7 +21,7 @@ impl FromArg for IpCidrArg {
     fn from_arg(arg: &str) -> Result<Self, ParseError> where Self: Sized {
         match IpCidr::from_str(arg) {
             Ok(ip_address) => Ok(IpCidrArg(ip_address)),
-            Err(_) => Err(ParseError::InvalidValue(format!("\"{arg}\", needed IPv4 or IPv6 address with subnet mask (Cidr)")))
+            Err(_) => Err(ParseError::InvalidValue(format!("\"{arg}\", need an IPv4 or IPv6 address with subnet mask (Cidr)")))
         }
     }
 }

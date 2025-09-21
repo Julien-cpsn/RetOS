@@ -12,7 +12,7 @@ use goolog::log::{set_max_level, Level, LevelFilter};
 use retos_kernel::logger::print_log;
 use retos_kernel::memory::tables::{MAPPER, MEMORY_REGIONS};
 use retos_kernel::task::executor::{run_tasks, spawn_task};
-use retos_kernel::task::keyboard;
+use retos_kernel::task::terminal;
 use retos_kernel::task::task::Task;
 use retos_kernel::terminal::commands::scanpci::scanpci;
 use retos_kernel::{memory, printer, println};
@@ -86,7 +86,7 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
     /* --- Kernel loop --- */
 
     spawn_task(Task::new(String::from("Scan PCI"), async { scanpci().unwrap(); }));
-    spawn_task(Task::new(String::from("Terminal"), keyboard::handle_keyboard()));
+    spawn_task(Task::new(String::from("Terminal"), terminal::handle_keyboard()));
     run_tasks();
 }
 

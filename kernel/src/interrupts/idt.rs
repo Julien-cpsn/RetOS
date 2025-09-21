@@ -90,7 +90,7 @@ extern "x86-interrupt" fn keyboard_interrupt_handler(_stack_frame: InterruptStac
         let mut keyboard = KEYBOARD.write();
         if let Ok(Some(key_event)) = keyboard.add_byte(scancode) {
             if let Some(key) = keyboard.process_keyevent(key_event) {
-                task::keyboard::add_key(key);
+                task::terminal::add_key(key);
             }
         }
     }
@@ -116,7 +116,7 @@ extern "x86-interrupt" fn serial_interrupt_handler(_stack_frame: InterruptStackF
             _ => return
         };
 
-        task::keyboard::add_key(key);
+        task::terminal::add_key(key);
     }
 
     PIC

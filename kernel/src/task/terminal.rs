@@ -1,9 +1,8 @@
 use crate::printer::buffer::WRITER;
+use crate::println;
 use crate::terminal::args::CliArgs;
 use crate::terminal::cli::{handle_command, set_max_verbosity, Cli};
-use crate::println;
 use alloc::format;
-use alloc::string::ToString;
 use core::pin::Pin;
 use core::task::{Context, Poll};
 use crossbeam_queue::ArrayQueue;
@@ -85,6 +84,8 @@ pub async fn handle_keyboard() {
         WRITER.clone()
     );
 
+    cli.reset_line();
+
     while let Some(key) = scancodes.next().await {
         match key {
             DecodedKey::RawKey(key) => match key {
@@ -109,9 +110,14 @@ pub async fn handle_keyboard() {
                         },
                         Err(parse_error) => {
                             match parse_error {
-                                ParseError::EmptyInput => {},
-                                ParseError::UnknownSubcommand => println!("Unknown command: {}", command),
-                                error => println!("{}", error.to_string())
+                                ParseError::EmptyInput => {}
+                                ParseError::Help(help) => println!("{}", help),
+                                ParseError::MissingArgument(argument) => println!("{} {}", "Missing required argument:".red(), argument),
+                                ParseError::InvalidValue(value) => println!("{} {}", "Invalid value:".red(), value),
+                                ParseError::UnknownArgument(argument) => println!("{} {}", "Unknown argument:".red(), argument),
+                                ParseError::UnknownSubcommand => println!("{} {}", "Unknown command:".red(), command),
+                                ParseError::InvalidFormat(format) => println!("{} {}", "Invalid format:".red(), format),
+                                ParseError::UnknownEnumVariant(value, possible_values) => println!("{} {}, possible values are: {}", "Invalid value:".red(), value, possible_values)
                             }
                         }
                     }
