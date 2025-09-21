@@ -73,7 +73,7 @@ You can directly plug your device onto the PC and boot it :)
 ## Done & TODOs
 
 - **Core**
-  - [ ] Multi-threading
+  - [ ] Multi-threading (SMP)
   - [x] ANSI colors (WIP)
   - [x] Log system (with [goolog](https://github.com/Gooxey/goolog))
   - [x] Internal clock
@@ -102,12 +102,12 @@ You can directly plug your device onto the PC and boot it :)
       - [x] show
       - [x] add
       - [x] delete
-      - [ ] change
+      - [ ] modify
     - [x] route
       - [x] show
       - [x] add
       - [x] delete
-      - [ ] change
+      - [ ] modify
   - [x] ping (WIP)
   - [x] sleep
   - [x] top (WIP)
@@ -120,15 +120,17 @@ You can directly plug your device onto the PC and boot it :)
   - [x] clear
   - [x] echo
 - **Network**
+  - [ ] SSH
   - [ ] Routing stack
-  - [x] TCP/IP stack (with [smol-tcp](https://github.com/smoltcp-rs/smoltcp))
+  - [ ] Packet forwarding
+  - [x] Host-side TCP/IP stack (with [smol-tcp](https://github.com/smoltcp-rs/smoltcp))
 - **Memory**
   - [ ] More precise heap allocation
   - [x] Heap allocation (with [Talc](https://github.com/SFBdragon/talc))
   - [x] Memory pagination
 - **Others**
   - [ ] multiboot2 (maybe need [multiboot2](https://github.com/rust-osdev/multiboot2), [doc](https://docs.rs/multiboot2/latest/multiboot2/))
-  - [ ] Linux VM?
+  - [ ] Linux VM virtualization
 
 ## Contributors
 
