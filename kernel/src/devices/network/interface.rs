@@ -1,11 +1,11 @@
 use crate::clock::Clock;
+use crate::devices::network::controller::NetworkController;
 use alloc::format;
 use alloc::string::String;
 use alloc::vec::Vec;
 use smoltcp::iface::{Config, Interface};
 use smoltcp::phy::{Loopback, Medium};
 use smoltcp::wire::{EthernetAddress, IpAddress, IpCidr};
-use crate::devices::network::controller::NetworkController;
 
 pub fn init_loopback_interface() -> Interface {
     let mut loopback = Loopback::new(Medium::Ethernet);

@@ -42,11 +42,42 @@ pub fn ping(remote_addr: IpAddress, count: u16, timeout: u64) -> Result<(), CliE
         return Err(CliError::Message(String::from("The given address is not unicast")));
     }
 
-    // TODO
-    let iface_name = "eth0";
-
     let mut manager = NETWORK_MANAGER.lock();
-    let local_device = manager.interfaces.get_mut(iface_name).unwrap().clone();
+
+    let mut iface_name = None;
+    let now = Clock::now();
+
+    for (device_name, device) in &manager.interfaces {
+        let mut device = device.lock();
+        let mut has_route = false;
+
+        device.interface
+            .routes_mut()
+            .update(|routes| {
+                has_route = routes
+                    .iter()
+                    .filter(|route| {
+                        if let Some(expires_at) = route.expires_at {
+                            if now > expires_at {
+                                return false;
+                            }
+                        }
+                        route.cidr.contains_addr(&remote_addr)
+                    })
+                    .max_by_key(|route| route.cidr.prefix_len())
+                    .is_some();
+            });
+
+        if has_route {
+            iface_name = Some(device_name.clone());
+        }
+    }
+
+    if iface_name.is_none() {
+        return Err(CliError::Message(String::from("No interface found to ping from")));
+    }
+
+    let local_device = manager.interfaces.get_mut(iface_name.as_ref().unwrap()).unwrap().clone();
     drop(manager);
 
     let device_caps = local_device.lock().network_controller.capabilities();

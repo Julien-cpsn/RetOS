@@ -26,7 +26,7 @@ pub fn ip_interface_show() -> Result<(), CliError> {
 
     let network_manager = NETWORK_MANAGER.lock();
 
-    table.push(row_from_interface(String::from("lo"), String::from("Loopback"), &network_manager.loopback));
+    table.push(row_from_interface(String::from("lo"), String::from("Loopback"), &network_manager.loopback.interface));
     
     for (name, device) in network_manager.interfaces.iter() {
         let device = device.lock();

@@ -72,18 +72,19 @@ pub fn ip_address_delete(ip_address: IpCidr, interface_name: &str) -> Result<(),
     debug!("Finding IP address");
     let mut was_address_found = false;
 
-    iface.update_ip_addrs(|addresses| {
-        addresses.retain(|address| {
-            if address == &ip_address {
-                info!("Deleting IP address");
-                was_address_found = true;
-                false
-            }
-            else {
-                true
-            }
-        })
-    });
+    iface
+        .update_ip_addrs(|addresses| {
+            addresses.retain(|address| {
+                if address == &ip_address {
+                    info!("Deleting IP address");
+                    was_address_found = true;
+                    false
+                }
+                else {
+                    true
+                }
+            })
+        });
 
     trace!("NETWORK_INTERFACES mutex freed");
 

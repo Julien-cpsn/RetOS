@@ -4,12 +4,14 @@ use crate::devices::network::interface::{format_mac, init_loopback_interface, in
 use crate::devices::pic::pic::PIC;
 use alloc::collections::BTreeMap;
 use alloc::sync::Arc;
-use alloc::{format, vec};
+use alloc::{format};
 use alloc::string::String;
 use alloc::vec::Vec;
 use goolog::{info, trace};
 use smoltcp::iface::{Interface, SocketSet};
+use smoltcp::phy::Medium;
 use spin::{Lazy, Mutex};
+use crate::clock::Clock;
 use crate::devices::network::device::NetworkDevice;
 
 const GOOLOG_TARGET: &str = "NETWORK";
@@ -20,8 +22,14 @@ pub static NETWORK_MANAGER: Lazy<Mutex<NetworkManager>> = Lazy::new(|| Mutex::ne
 
 pub struct NetworkManager<'a> {
     pub irq_to_devices: BTreeMap<u8, Vec<String>>,
-    pub loopback: Interface,
+    pub loopback: Loopback<'a>,
     pub interfaces: BTreeMap<String, Arc<Mutex<NetworkDevice<'a>>>>
+}
+
+pub struct Loopback<'a> {
+    pub interface: Interface,
+    pub device: smoltcp::phy::Loopback,
+    pub sockets: Arc<Mutex<SocketSet<'a>>>
 }
 
 impl Default for NetworkManager<'_> {
@@ -34,7 +42,11 @@ impl NetworkManager<'_> {
     pub fn new() -> Self {
         NetworkManager {
             irq_to_devices: BTreeMap::new(),
-            loopback: init_loopback_interface(),
+            loopback: Loopback {
+                interface: init_loopback_interface(),
+                device: smoltcp::phy::Loopback::new(Medium::Ethernet),
+                sockets: Arc::new(Mutex::new(SocketSet::new(Vec::new()))),
+            },
             interfaces: BTreeMap::new(),
         }
     }
@@ -54,7 +66,7 @@ impl NetworkManager<'_> {
         let device = NetworkDevice {
             interface,
             network_controller,
-            sockets: Arc::new(Mutex::new(SocketSet::new(vec![]))),
+            sockets: Arc::new(Mutex::new(SocketSet::new(Vec::new()))),
         };
 
         let device_index = self.interfaces.len();
@@ -104,5 +116,17 @@ impl NetworkManager<'_> {
                 locked_device.poll();
             }
         }
+        
+        self.loopback.poll();
+    }
+}
+
+impl Loopback<'_> {
+    pub fn poll(&mut self) {
+        let now = Clock::now();
+        let iface = &mut self.interface;
+        let device = &mut self.device;
+        let sockets = &mut self.sockets.lock();
+        iface.poll(now, device, sockets);
     }
 }

@@ -97,14 +97,18 @@ pub fn ip_route_add(ip_address: IpCidr, interface_name: &str, gateway: IpAddress
     let iface = &mut locked_device.interface;
 
     info!("Adding IP route");
-    iface.routes_mut().update(|routes| {
-        routes.push(Route {
-            cidr: ip_address,
-            via_router: gateway,
-            preferred_until: None,
-            expires_at: None,
-        }).unwrap();
-    });
+    iface
+        .routes_mut()
+        .update(|routes| {
+        routes
+                .push(Route {
+                    cidr: ip_address,
+                    via_router: gateway,
+                    preferred_until: None,
+                    expires_at: None,
+                })
+                .unwrap();
+        });
 
     trace!("NETWORK_INTERFACES mutex freed");
 
@@ -125,18 +129,20 @@ pub fn ip_route_delete(ip_address: IpCidr, interface_name: &str) -> Result<(), C
     debug!("Finding IP route");
     let mut was_route_found = false;
     
-    iface.routes_mut().update(|routes| {
-        routes.retain(|route| {
-            if route.cidr == ip_address {
-                info!("Deleting IP route");
-                was_route_found = true;
-                false
-            }
-            else { 
-                true
-            }
-        })
-    });
+    iface
+        .routes_mut()
+        .update(|routes| {
+            routes.retain(|route| {
+                if route.cidr == ip_address {
+                    info!("Deleting IP route");
+                    was_route_found = true;
+                    false
+                }
+                else {
+                    true
+                }
+            })
+        });
 
     trace!("NETWORK_INTERFACES mutex freed");
 
