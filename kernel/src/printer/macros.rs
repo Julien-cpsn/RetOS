@@ -17,6 +17,21 @@ macro_rules! clear {
     () => {$crate::printer::macros::_clear()};
 }
 
+#[macro_export]
+macro_rules! dbg {
+    ($val:expr $(,)?) => {
+        match $val {
+            tmp => {
+                $crate::println!("{} = {:#?}\n", stringify!($val), &tmp as &dyn core::fmt::Debug);
+                tmp
+            }
+        }
+    };
+    ($($val:expr),+ $(,)?) => {
+        ($($crate::dbg!($val)),+,)
+    };
+}
+
 #[doc(hidden)]
 pub fn _print(args: fmt::Arguments) {
     use core::fmt::Write;
