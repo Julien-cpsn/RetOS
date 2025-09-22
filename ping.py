@@ -2,11 +2,11 @@ import socket
 import time
 import struct
 
-def create_network_packet():
+def create_network_packet(mac_address):
     # Adresse MAC source (6 octets)
     src_mac = bytearray((0xc0, 0x47, 0x0e, 0x6b, 0x84, 0x79))
     # Adresse MAC destination (6 octets)
-    dst_mac = bytearray((0x52, 0x54, 0x0, 0x12, 0x34, 0x56))
+    dst_mac = bytearray(mac_address)
     # Type Ethernet (IPv4 : 0x0800)
     eth_type = b'\x08\x00'
 
@@ -53,11 +53,18 @@ def create_network_packet():
     packet = ethernet_header + ip_header + udp_header + payload
     return bytearray(packet)
 
-s = socket.socket(socket.AF_PACKET, socket.SOCK_RAW)
-s.bind(("tap0", 0))
-ping_frame = create_network_packet()
+s0 = socket.socket(socket.AF_PACKET, socket.SOCK_RAW)
+s0.bind(("tap0", 0))
+s1 = socket.socket(socket.AF_PACKET, socket.SOCK_RAW)
+s1.bind(("tap1", 0))
 
 while True:
-    print("ping")
-    s.send(bytearray(ping_frame))
+    #"""
+    print("ping tap0")
+    s0.send(bytearray(create_network_packet((0x52, 0x54, 0x0, 0x12, 0x34, 0x56))))
     time.sleep(1)
+    #"""
+    print("ping tap1")
+    s1.send(bytearray(create_network_packet((0x52, 0x54, 0x0, 0x12, 0x34, 0x57))))
+    time.sleep(1)
+    #"""

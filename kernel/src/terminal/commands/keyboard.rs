@@ -1,16 +1,17 @@
 use goolog::{debug, trace};
+use no_std_clap_macros::EnumValuesArg;
 use pc_keyboard::{HandleControl, Keyboard, ScancodeSet1};
 use pc_keyboard::layouts::{AnyLayout, Azerty, Colemak, DVP104Key, De105Key, Dvorak104Key, FiSe105Key, Jis109Key, No105Key, Uk105Key, Us104Key};
 use strum::{EnumString, VariantNames};
-use crate::arg_from_enum;
 use crate::interrupts::idt::KEYBOARD;
 use crate::terminal::error::CliError;
 
 const GOOLOG_TARGET: &str = "KEYBOARD";
 
-#[derive(VariantNames, EnumString)]
+#[derive(Default, EnumValuesArg, VariantNames, EnumString)]
 #[strum(serialize_all = "lowercase")]
-enum KeyboardLayout {
+pub enum KeyboardLayout {
+    #[default]
     Azerty,
     Colemak,
     De,
@@ -23,12 +24,10 @@ enum KeyboardLayout {
     Us,
 }
 
-arg_from_enum!(KeyboardLayout);
-
-pub fn change_layout(layout: KeyboardLayoutArg) -> Result<(), CliError> {
+pub fn change_layout(layout: KeyboardLayout) -> Result<(), CliError> {
     trace!("KEYBOARD");
     
-    let layout = match layout.0 {
+    let layout = match layout {
         KeyboardLayout::Azerty => AnyLayout::Azerty(Azerty),
         KeyboardLayout::Colemak => AnyLayout::Colemak(Colemak),
         KeyboardLayout::De => AnyLayout::De105Key(De105Key),

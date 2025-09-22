@@ -1,3 +1,4 @@
+use alloc::sync::Arc;
 use crate::devices::serial::SERIAL1;
 use crate::printer::buffer::font_constants::{DEFAULT_DIM_FACTOR, DEFAULT_FONT_WEIGHT};
 use crate::printer::color::{Color, DEFAULT_BACKGROUND, DEFAULT_FOREGROUND};
@@ -15,7 +16,7 @@ const LINE_SPACING: usize = 2;
 const LETTER_SPACING: usize = 0;
 
 /// Padding from the border. Prevent that font is too close to border.
-const BORDER_PADDING: usize = 1;
+pub const BORDER_PADDING: usize = 1;
 
 /// Constants for the usage of the [`noto_sans_mono_bitmap`] crate.
 mod font_constants {
@@ -38,7 +39,7 @@ mod font_constants {
 
 /// A global `Writer` instance.
 /// Used by the `print!` and `println!` macros.
-pub static WRITER: Lazy<RwLock<Writer>> = Lazy::new(|| RwLock::new(Writer {
+pub static WRITER: Lazy<Arc<RwLock<Writer>>> = Lazy::new(|| Arc::new(RwLock::new(Writer {
     framebuffer: None,
     info: None,
     x: BORDER_PADDING,
@@ -49,8 +50,11 @@ pub static WRITER: Lazy<RwLock<Writer>> = Lazy::new(|| RwLock::new(Writer {
     escape_params: smallvec![],
     current_escape_param: 0,
     font_weight: DEFAULT_FONT_WEIGHT,
-    dim_factor: DEFAULT_DIM_FACTOR
-}));
+    dim_factor: DEFAULT_DIM_FACTOR,
+    show_cursor: false,
+    cursor_x: 0,
+    cursor_y: 0,
+})));
 
 /// Supports newline characters and implements the `core::fmt::Write` trait.
 pub struct Writer {
@@ -65,6 +69,9 @@ pub struct Writer {
     pub current_escape_param: u16,
     pub font_weight: FontWeight,
     pub dim_factor: u16,
+    pub show_cursor: bool,
+    pub cursor_x: usize,
+    pub cursor_y: usize
 }
 
 #[derive(PartialEq, Eq, Clone, Copy)]
@@ -82,12 +89,32 @@ pub fn set_framebuffer(buffer: &'static mut [u8], info: FrameBufferInfo) {
 }
 
 impl Writer {
-    fn newline(&mut self) {
+    #[inline]
+    pub fn width(&self) -> usize {
+        self.info.unwrap().width
+    }
+
+    #[inline]
+    pub fn height(&self) -> usize {
+        self.info.unwrap().height
+    }
+
+    #[inline]
+    pub fn column_width() -> usize {
+        font_constants::CHAR_RASTER_WIDTH + LETTER_SPACING
+    }
+
+    #[inline]
+    pub fn row_height() -> usize {
+        font_constants::CHAR_RASTER_HEIGHT.val() + LINE_SPACING
+    }
+
+    pub fn newline(&mut self) {
         self.y += font_constants::CHAR_RASTER_HEIGHT.val() + LINE_SPACING;
         self.carriage_return()
     }
 
-    fn carriage_return(&mut self) {
+    pub fn carriage_return(&mut self) {
         self.x = BORDER_PADDING;
     }
 
@@ -102,14 +129,34 @@ impl Writer {
     }
 
     pub fn clear_line(&mut self) {
-        let width = self.width();
-        if let Some(buffer) = self.framebuffer.as_mut() {
-            let line_start = self.y * width;
-            let line_end = line_start + width;
-            buffer[line_start..line_end].fill(0);
+        if let (Some(info), Some(buffer)) = (self.info.as_ref(), self.framebuffer.as_mut()) {
+            let bytes_per_pixel = info.bytes_per_pixel;
+            // pixels per framebuffer row (may include padding)
+            let stride_pixels = info.stride;
+            let line_height = font_constants::CHAR_RASTER_HEIGHT.val();
+
+            // start pixel row (y) might be beyond height — clamp defensively
+            let fb_height = info.height;
+            if self.y < fb_height {
+                // compute byte offsets
+                let start_pixel = self.y; // pixel row index to start clearing
+                let end_pixel = core::cmp::min(self.y + line_height, fb_height); // exclusive
+
+                let start_byte = start_pixel * stride_pixels * bytes_per_pixel;
+                let end_byte = end_pixel * stride_pixels * bytes_per_pixel;
+
+                // safety: ensure we don't panic if info is inconsistent
+                let buf_len = buffer.len();
+                let start = core::cmp::min(start_byte, buf_len);
+                let end = core::cmp::min(end_byte, buf_len);
+
+                if start < end {
+                    buffer[start..end].fill(0);
+                }
+            }
         }
-        
-        //self.y = (self.y - 1) * width;
+
+        // move cursor to start of line
         self.carriage_return();
     }
 
@@ -130,16 +177,6 @@ impl Writer {
                 self.write_pixel(self.x + x, self.y + y, 0, 0, 0);
             }
         }
-    }
-
-    #[inline]
-    fn width(&self) -> usize {
-        self.info.unwrap().width
-    }
-
-    #[inline]
-    fn height(&self) -> usize {
-        self.info.unwrap().height
     }
 
     pub fn write_byte(&mut self, byte: u8) {
@@ -386,6 +423,18 @@ impl Writer {
         self.bg_color = DEFAULT_BACKGROUND;
         self.font_weight = DEFAULT_FONT_WEIGHT;
         self.dim_factor = DEFAULT_DIM_FACTOR;
+    }
+
+    pub fn draw_cursor(&mut self) {
+        if !self.show_cursor {
+            return;
+        }
+
+        let char_height = font_constants::CHAR_RASTER_HEIGHT.val();
+
+        for y in 0..char_height {
+            self.write_pixel(self.cursor_x + 1, self.cursor_y + y, 255, 255, 255); // white cursor
+        }
     }
 }
 

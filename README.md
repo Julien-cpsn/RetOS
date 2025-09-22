@@ -72,8 +72,8 @@ You can directly plug your device onto the PC and boot it :)
 
 ## Done & TODOs
 
-- Core
-  - [ ] Multi-threading
+- **Core**
+  - [ ] Multi-threading (SMP)
   - [x] ANSI colors (WIP)
   - [x] Log system (with [goolog](https://github.com/Gooxey/goolog))
   - [x] Internal clock
@@ -83,7 +83,7 @@ You can directly plug your device onto the PC and boot it :)
   - [x] Main x86_64 instructions, exceptions and interruptions (with [x86_64](https://github.com/rust-osdev/x86_64))
   - [x] Bootloader (with [bootloader](https://github.com/rust-osdev/bootloader))
   - [x] Standalone kernel
-- Devices
+- **Devices**
   - [ ] VirtIO? (maybe [rust-osdev/virtio](https://docs.rs/virtio-spec/latest/virtio_spec/))
   - [ ] USB (maybe [rust-osdev/usb](https://github.com/rust-osdev/usb) or [usb-device](https://docs.rs/usb-device/latest/usb_device/index.html))
   - [x] Serial port (with [uart_16550](https://github.com/rust-osdev/uart_16550))
@@ -94,7 +94,22 @@ You can directly plug your device onto the PC and boot it :)
   - [x] PCI (WIP with [pci_types](https://docs.rs/pci_types/0.10.0/pci_types/))
   - [x] PS2 Keyboard (with [pc_keyboard](https://github.com/rust-embedded-community/pc-keyboard))
   - [x] Legacy PIC (with [pic8259](https://github.com/rust-osdev/pic8259))
-- Commands
+- **Commands**
+  - [x] ip
+    - [x] interface
+      - [x] show
+    - [x] address
+      - [x] show
+      - [x] add
+      - [x] delete
+      - [ ] modify
+    - [x] route
+      - [x] show
+      - [x] add
+      - [x] delete
+      - [ ] modify
+  - [x] ping (WIP)
+  - [x] sleep
   - [x] top (WIP)
   - [x] scanpci
   - [x] lspci
@@ -104,16 +119,18 @@ You can directly plug your device onto the PC and boot it :)
   - [x] uptime
   - [x] clear
   - [x] echo
-- Network
-  - [ ] TCP/IP stack (maybe [smol-tcp](https://github.com/smoltcp-rs/smoltcp))
+- **Network**
+  - [ ] SSH
   - [ ] Routing stack
-- Memory
+  - [ ] Packet forwarding
+  - [x] Host-side TCP/IP stack (with [smol-tcp](https://github.com/smoltcp-rs/smoltcp))
+- **Memory**
   - [ ] More precise heap allocation
   - [x] Heap allocation (with [Talc](https://github.com/SFBdragon/talc))
   - [x] Memory pagination
-- Others
+- **Others**
   - [ ] multiboot2 (maybe need [multiboot2](https://github.com/rust-osdev/multiboot2), [doc](https://docs.rs/multiboot2/latest/multiboot2/))
-  - [ ] Linux VM?
+  - [ ] Linux VM virtualization
 
 ## Contributors
 

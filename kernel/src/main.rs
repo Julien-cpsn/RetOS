@@ -9,11 +9,10 @@ use bootloader_api::{BootInfo, BootloaderConfig};
 use core::panic::PanicInfo;
 use goolog::init_logger;
 use goolog::log::{set_max_level, Level, LevelFilter};
-use retos_kernel::clock::MilliSecondClock;
 use retos_kernel::logger::print_log;
 use retos_kernel::memory::tables::{MAPPER, MEMORY_REGIONS};
 use retos_kernel::task::executor::{run_tasks, spawn_task};
-use retos_kernel::task::keyboard;
+use retos_kernel::task::terminal;
 use retos_kernel::task::task::Task;
 use retos_kernel::terminal::commands::scanpci::scanpci;
 use retos_kernel::{memory, printer, println};
@@ -29,8 +28,7 @@ const HELLO_WORLD: &str = r#"
 |  |  _  // _ \ __| |  | |\___ \   |
 |  | | \ \  __/ |_| |__| |____) |  |
 |  |_|  \_\___|\__|\____/|_____/   |
-\----------------------------------/
-"#;
+\----------------------------------/"#;
 
 pub static BOOTLOADER_CONFIG: BootloaderConfig = {
     let mut config = BootloaderConfig::new_default();
@@ -79,10 +77,7 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
     init_logger(
         Some(Level::Trace),
         None,
-        &|_timestamp, target, level, args| {
-            let timestamp = MilliSecondClock::format();
-            print_log(&timestamp, target, level, args);
-        },
+        &|_timestamp, target, level, args| print_log(target, level, args)
     )
         .expect("Could not initialize logger");
 
@@ -91,7 +86,7 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
     /* --- Kernel loop --- */
 
     spawn_task(Task::new(String::from("Scan PCI"), async { scanpci().unwrap(); }));
-    spawn_task(Task::new(String::from("Terminal"), keyboard::handle_keyboard()));
+    spawn_task(Task::new(String::from("Terminal"), terminal::handle_keyboard()));
     run_tasks();
 }
 

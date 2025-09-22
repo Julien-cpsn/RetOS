@@ -1,17 +1,18 @@
 use crate::devices::mmio::MemoryMapper;
-use crate::devices::network_controller::{register_network_controller, NetworkController, NETWORK_CONTROLLER_WAKER};
 use crate::devices::pci::{PciDevice, PCI_ACCESS};
 use crate::memory::tables::translate_addr;
 use alloc::boxed::Box;
 use alloc::{vec};
+use alloc::sync::Arc;
 use alloc::vec::Vec;
-use core::marker::PhantomData;
 use accessor::Mapper;
 use crossbeam_queue::SegQueue;
 use goolog::{debug};
 use pci_types::{CommandRegister, EndpointHeader, PciHeader};
+use spin::Mutex;
 use x86_64::instructions::interrupts;
 use x86_64::VirtAddr;
+use crate::devices::network::manager::NETWORK_MANAGER;
 
 const GOOLOG_TARGET: &str = "E1000";
 
@@ -117,8 +118,8 @@ const RX_DESCRIPTORS: usize = 32;
 const TX_DESCRIPTORS: usize = 32;
 
 // Packet buffer size - must align with RCTL_BSIZE setting
-const RX_BUFFER_SIZE: usize = 2048;
-const TX_BUFFER_SIZE: usize = 2048;
+pub const RX_BUFFER_SIZE: usize = 2048;
+pub const TX_BUFFER_SIZE: usize = 2048;
 
 #[repr(C, align(16))]
 #[derive(Debug, Copy, Clone)]
@@ -146,25 +147,29 @@ pub struct RxDescriptor {
 #[derive(Debug)]
 pub struct E1000 {
     pub mac: [u8; 6],
-    pub state: E1000State,
-    pub frames: SegQueue<Vec<u8>>,
-    pub rx: PhantomData<()>,
-    pub tx: Vec<Vec<u8>>,
+    state: E1000State,
+    frames: SegQueue<Vec<u8>>
 }
 
 #[derive(Debug)]
-pub struct E1000State {
+struct E1000State {
     pub mmio_base: u64,
+    pub rx: Mutex<E1000Rx>,
+    pub tx: Mutex<E1000Tx>,
+}
 
-    // TX and RX descriptors and buffers
-    pub tx_descriptors: Box<[TxDescriptor; TX_DESCRIPTORS]>,
+#[derive(Debug)]
+pub struct E1000Rx {
     pub rx_descriptors: Box<[RxDescriptor; RX_DESCRIPTORS]>,
-    pub tx_buffers: Box<Vec<[u8; TX_BUFFER_SIZE]>>,
     pub rx_buffers: Box<Vec<[u8; RX_BUFFER_SIZE]>>,
-
-    // Cursor positions for TX and RX rings
-    pub tx_cursor: usize,
     pub rx_cursor: usize,
+}
+
+#[derive(Debug)]
+pub struct E1000Tx {
+    pub tx_descriptors: Box<[TxDescriptor; TX_DESCRIPTORS]>,
+    pub tx_buffers: Box<Vec<[u8; TX_BUFFER_SIZE]>>,
+    pub tx_cursor: usize,
 }
 
 pub fn init_e1000(pci_device: &PciDevice) {
@@ -186,7 +191,9 @@ pub fn init_e1000(pci_device: &PciDevice) {
     let mut e1000 = E1000::new(virt_mmio_base as u64);
     e1000.init();
 
-    register_network_controller(NetworkController::E1000(Box::from(e1000)), line as u32)
+    NETWORK_MANAGER
+        .lock()
+        .register_device(line, Arc::new(Mutex::new(e1000)));
 }
 
 impl E1000 {
@@ -218,20 +225,22 @@ impl E1000 {
 
         let state = E1000State {
             mmio_base,
-            tx_descriptors: Box::from(tx_descriptors),
-            rx_descriptors: Box::from(rx_descriptors),
-            tx_buffers: Box::from(tx_buffers),
-            rx_buffers: Box::from(rx_buffers),
-            tx_cursor: 0,
-            rx_cursor: 0,
+            rx: Mutex::new(E1000Rx {
+                rx_descriptors: Box::from(rx_descriptors),
+                rx_buffers: Box::from(rx_buffers),
+                rx_cursor: 0,
+            }),
+            tx: Mutex::new(E1000Tx {
+                tx_descriptors: Box::from(tx_descriptors),
+                tx_buffers: Box::from(tx_buffers),
+                tx_cursor: 0,
+            })
         };
 
         Self {
             mac: [0; 6],
             state,
             frames: SegQueue::new(),
-            rx: PhantomData,
-            tx: Vec::new(),
         }
     }
 
@@ -307,7 +316,8 @@ impl E1000 {
             self.mac[3] = ((low >> 24) & 0xFF) as u8;
             self.mac[4] = (high & 0xFF) as u8;
             self.mac[5] = ((high >> 8) & 0xFF) as u8;
-        } else {
+        }
+        else {
             // Read from RAL0/RAH0 registers which may be pre-programmed
 
             let low = self.read_register(REG_RAL0);
@@ -326,13 +336,15 @@ impl E1000 {
         self.write_register(REG_RAH0, (1 << 31) | (self.mac[5] as u32) << 8 | (self.mac[4] as u32));
     }
 
-    fn setup_rx_descriptors(&mut self) {
+    fn setup_rx_descriptors(&self) {
+        let mut rx = self.state.rx.lock();
+        
         // Initialize rx descriptors and link them to buffers
         for i in 0..RX_DESCRIPTORS {
-            let buffer_addr = VirtAddr::new(self.state.rx_buffers[i].as_ptr() as u64);
+            let buffer_addr = VirtAddr::new(rx.rx_buffers[i].as_ptr() as u64);
             let phys_addr = translate_addr(buffer_addr).unwrap().as_u64();
 
-            self.state.rx_descriptors[i] = RxDescriptor {
+            rx.rx_descriptors[i] = RxDescriptor {
                 buffer_addr: phys_addr,
                 length: 0,
                 checksum: 0,
@@ -343,7 +355,7 @@ impl E1000 {
         }
 
         // Setup the registers for the rx ring
-        let desc_addr = VirtAddr::new(self.state.rx_descriptors.as_ptr() as u64);
+        let desc_addr = VirtAddr::new(rx.rx_descriptors.as_ptr() as u64);
         let phys_addr = translate_addr(desc_addr).unwrap().as_u64();
 
         // Set the descriptor base address
@@ -351,7 +363,7 @@ impl E1000 {
         self.write_register(REG_RDBAH, (phys_addr >> 32) as u32);
 
         // Set the descriptor ring length (in bytes)
-        self.write_register(REG_RDLEN, (RX_DESCRIPTORS * core::mem::size_of::<RxDescriptor>()) as u32);
+        self.write_register(REG_RDLEN, (RX_DESCRIPTORS * size_of::<RxDescriptor>()) as u32);
 
         // Initialize head and tail pointers
         self.write_register(REG_RDH, 0);
@@ -359,16 +371,18 @@ impl E1000 {
         self.write_register(REG_RDT, (RX_DESCRIPTORS - 1) as u32);
 
         // Start with the first descriptor
-        self.state.rx_cursor = 0;
+        rx.rx_cursor = 0;
     }
 
     fn setup_tx_descriptors(&mut self) {
+        let mut tx = self.state.tx.lock();
+        
         // Initialize tx descriptors and link them to buffers
         for i in 0..TX_DESCRIPTORS {
-            let buffer_addr = VirtAddr::new(self.state.tx_buffers[i].as_ptr() as u64);
+            let buffer_addr = VirtAddr::new(tx.tx_buffers[i].as_ptr() as u64);
             let phys_addr = translate_addr(buffer_addr).unwrap().as_u64();
 
-            self.state.tx_descriptors[i] = TxDescriptor {
+            tx.tx_descriptors[i] = TxDescriptor {
                 buffer_addr: phys_addr,
                 length: 0,
                 cso: 0,
@@ -380,7 +394,7 @@ impl E1000 {
         }
 
         // Setup the registers for the tx ring
-        let desc_addr = VirtAddr::new(self.state.tx_descriptors.as_ptr() as u64);
+        let desc_addr = VirtAddr::new(tx.tx_descriptors.as_ptr() as u64);
         let phys_addr = translate_addr(desc_addr).unwrap().as_u64();
 
         // Set the descriptor base address
@@ -395,7 +409,7 @@ impl E1000 {
         self.write_register(REG_TDT, 0);
 
         // Start with the first descriptor
-        self.state.tx_cursor = 0;
+        tx.tx_cursor = 0;
     }
 
     fn configure_tx(&self) {
@@ -416,23 +430,23 @@ impl E1000 {
     fn enable_interrupts(&self) {
         // Clear any pending interrupts first
         let icr = self.read_register(REG_INTERRUPT_CAUSE);
-        self.write_register(REG_INTERRUPT_CAUSE, icr);
+        if icr != 0 {
+            self.write_register(REG_INTERRUPT_CAUSE, icr);
+        }
 
-        self.write_register(REG_INTERRUPT_MASK, INTERRUPT_MASK);
-
-        // Make sure interrupts aren't disabled in the control register
-        /*
-        let ctrl = self.read_register(REG_CTRL);
-        if (ctrl & CTRL_SLU) == 0 {
-            self.write_register(REG_CTRL, ctrl | CTRL_SLU);
-        }*/
+        // Enable interrupts (set mask bits)
+        let old_mask = self.read_register(REG_INTERRUPT_MASK);
+        self.write_register(REG_INTERRUPT_MASK, old_mask | INTERRUPT_MASK);
     }
 
     /// Function that handles interrupts from the E1000
-    /// FIXME: Interrupts are locked after one go
-    pub fn on_interrupt(&mut self) {
+    pub fn on_interrupt(&self) -> bool {
         // Read the interrupt cause register
         let interrupt_cause = self.read_register(REG_INTERRUPT_CAUSE);
+
+        if interrupt_cause == 0 {
+            return false;
+        }
 
         // Clear interrupts by writing back the value
         self.write_register(REG_INTERRUPT_CAUSE, interrupt_cause);
@@ -450,6 +464,8 @@ impl E1000 {
 
         // Handle receive interrupts
         if (interrupt_cause & (INTERRUPT_RXT0 | INTERRUPT_RXDMT0 | INTERRUPT_RXO)) != 0 {
+            //println!("inter rx");
+
             if (interrupt_cause & INTERRUPT_RXO) != 0 {
                 // Implement recovery logic for overruns
                 // Reset RX if needed
@@ -461,47 +477,37 @@ impl E1000 {
 
         // Handle transmit interrupts
         if (interrupt_cause & (INTERRUPT_TXDW | INTERRUPT_TXQE)) != 0 {
-            let mut tx_processed = 0;
+            //println!("inter tx");
 
+            let mut tx = self.state.tx.lock();
+            let mut tx_processed = 0;
+            
             // Check for completed transmissions
             for i in 0..TX_DESCRIPTORS {
-                if (self.state.tx_descriptors[i].status & TX_DESC_STATUS_DD) == 0 {
+                if (tx.tx_descriptors[i].status & TX_DESC_STATUS_DD) == 0 {
                     continue;
                 }
 
                 // Free any associated buffers if needed
-                // self.free_tx_buffer(i);
+                tx.tx_buffers[i] = [0; TX_BUFFER_SIZE];
 
                 // Reset descriptor status
-                self.state.tx_descriptors[i].status = 0;
+                tx.tx_descriptors[i].status = 0;
+                tx.tx_descriptors[i].cmd = 0;
+                tx.tx_descriptors[i].length = 0;
                 tx_processed += 1;
-            }
-
-            // Handle pending transmissions
-            if (interrupt_cause & INTERRUPT_TXQE) != 0 && !self.tx.is_empty() {
-                let items = self.tx.drain(..).collect::<Vec<_>>();
-                for item in items {
-                    self.send_sync(&item);
-                }
             }
 
             // Wake any tasks waiting on transmit completion
             if tx_processed > 0 {
-                NETWORK_CONTROLLER_WAKER.wake();
+                
             }
         }
 
-        // Make sure we read the interrupt cause register again to check if any new
-        // interrupts have been generated during processing
-        /*
-        let new_interrupts = self.read_register(REG_INTERRUPT_CAUSE);
-        if new_interrupts != 0 {
-            // Clear any new interrupts that occurred during processing
-            self.write_register(REG_INTERRUPT_CAUSE, new_interrupts);
-        }*/
+        return true;
     }
 
-    fn reset_rx_ring(&mut self) {
+    fn reset_rx_ring(&self) {
         // Disable receive
         self.write_register(REG_RCTL, 0);
 
@@ -513,15 +519,17 @@ impl E1000 {
         self.write_register(REG_RCTL, rctl);
     }
 
-    fn process_rx_packets(&mut self) {
+    fn process_rx_packets(&self) {
+        let mut rx = self.state.rx.lock();
+        
         // Process received packets
-        let mut i = self.state.rx_cursor;
+        let mut i = rx.rx_cursor;
         let mut processed_packets = 0;
         let max_packets = RX_DESCRIPTORS;
 
         loop {
             // Check if descriptor is done
-            let desc = &mut self.state.rx_descriptors[i];
+            let desc = &mut rx.rx_descriptors[i];
 
             if (desc.status & RX_DESC_STATUS_DD) == 0 || processed_packets >= max_packets {
                 // Not ready or processed too many packets
@@ -539,19 +547,19 @@ impl E1000 {
                 continue;
             }
 
-            // We have a complete packet
-            let length = desc.length as usize;
-            if length > 0 {
-                // Copy the packet to a new buffer
-                let packet = self.state.rx_buffers[i][0..length].to_vec();
-                self.frames.push(packet);
-                NETWORK_CONTROLLER_WAKER.wake();
-            }
-
             // Reset the descriptor
             desc.status = 0;
             // Indicate that the descriptor is available
             self.write_register(REG_RDT, i as u32);
+
+            // Should be done before the descriptor reset but then rx cannot be borrowed as mutable twice
+            // We have a complete packet
+            let length = desc.length as usize;
+            if length > 0 {
+                // Copy the packet to a new buffer
+                let packet = rx.rx_buffers[i][0..length].to_vec();
+                self.frames.push(packet);
+            }
 
             // Update tail pointer
             let new_tail = (i + 1) % RX_DESCRIPTORS;
@@ -562,39 +570,41 @@ impl E1000 {
         }
 
         // Update our position in the ring
-        self.state.rx_cursor = i;
-    }
-
-    pub fn try_recv_sync(&mut self) -> Option<Vec<u8>> {
-        self.frames.pop()
+        rx.rx_cursor = i;
     }
 
     /// Send a packet
-    pub fn send_sync(&mut self, buffer: &[u8]) {
+    pub fn send_sync(&self, buffer: &[u8]) {
         interrupts::without_interrupts(|| {
-            let i = self.state.tx_cursor;
+            let mut tx = self.state.tx.lock();
+            
+            let i = tx.tx_cursor;
 
             // Wait for the descriptor to be free
             #[allow(clippy::while_immutable_condition)]
-            while (self.state.tx_descriptors[i].status & TX_DESC_STATUS_DD) == 0 && self.state.tx_descriptors[i].cmd != 0 {
+            while (tx.tx_descriptors[i].status & TX_DESC_STATUS_DD) == 0 && tx.tx_descriptors[i].cmd != 0 {
                 core::hint::spin_loop();
             }
 
             // Copy the data to the transmit buffer
             let len = core::cmp::min(buffer.len(), TX_BUFFER_SIZE);
-            self.state.tx_buffers[i][0..len].copy_from_slice(&buffer[0..len]);
+            tx.tx_buffers[i][0..len].copy_from_slice(&buffer[0..len]);
 
             // Setup the descriptor
-            self.state.tx_descriptors[i].length = len as u16;
-            self.state.tx_descriptors[i].cmd = TX_DESC_CMD_EOP | TX_DESC_CMD_IFCS | TX_DESC_CMD_RS;
-            self.state.tx_descriptors[i].status = 0;
+            tx.tx_descriptors[i].length = len as u16;
+            tx.tx_descriptors[i].cmd = TX_DESC_CMD_EOP | TX_DESC_CMD_IFCS | TX_DESC_CMD_RS;
+            tx.tx_descriptors[i].status = 0;
 
             // Update the tail pointer to start transmission
             let new_cursor = (i + 1) % TX_DESCRIPTORS;
             self.write_register(REG_TDT, new_cursor as u32);
 
             // Update our position in the ring
-            self.state.tx_cursor = new_cursor;
+            tx.tx_cursor = new_cursor;
         });
+    }
+
+    pub fn recv_sync(&mut self) -> Option<Vec<u8>> {
+        self.frames.pop()
     }
 }

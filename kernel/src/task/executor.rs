@@ -72,7 +72,8 @@ fn sleep_if_idle() {
 
     if TASK_QUEUE.lock().is_empty() {
         enable_and_hlt();
-    } else {
+    }
+    else {
         interrupts::enable();
     }
 }
